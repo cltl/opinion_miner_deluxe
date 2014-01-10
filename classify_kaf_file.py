@@ -8,7 +8,7 @@ import logging
 import cPickle
 
 from scripts.config_manager import Cconfig_manager
-from scripts.extract_features import extract_features_from_kaf_file
+from scripts.extract_features import extract_features_from_kaf_naf_file
 from scripts.crfutils import extract_features_to_crf 
 from scripts.link_entities_distance import link_entities_distance
 from scripts.relation_classifier import link_entities_svm
@@ -71,15 +71,15 @@ def match_crfsuite_out(crfout,list_token_ids):
     return matches
 
 
-def extract_features(kaf_data):
+def extract_features(knaf_data):
     feat_file_desc = NamedTemporaryFile(delete=False)
     feat_file_desc.close()
     
     out_file = feat_file_desc.name
     err_file = out_file+'.log'
     
-    labels, separator, kaf_obj = extract_features_from_kaf_file(kaf_data,out_file,err_file,include_class=False)
-    return out_file, err_file, kaf_obj
+    labels, separator, knaf_obj = extract_features_from_kaf_naf_file(knaf_data,out_file,err_file,include_class=False)
+    return out_file, err_file, knaf_obj
              
             
 def convert_to_crf(input_file,templates):
@@ -197,12 +197,16 @@ if __name__ == '__main__':
     
    
     #Create a temporary file
-    out_feat_file, err_feat_file, kaf_obj = extract_features(sys.stdin)
+    out_feat_file, err_feat_file, knaf_obj = extract_features(sys.stdin)
     
     #get all the tokens in order
     list_token_ids = []
     sentence_for_token = {}
-    for token, s_id, w_id in kaf_obj.getTokens(): 
+    for token_obj in knaf_obj.get_tokens():
+        token = token_obj.get_text()
+        s_id = token_obj.get_sent()
+        w_id = token_obj.get_id()
+         
         list_token_ids.append(w_id)
         sentence_for_token[w_id] = s_id
 
@@ -214,8 +218,10 @@ if __name__ == '__main__':
     # Entity linker based on distances
     ####triples = link_entities_distance(expressions,targets,holders,sentence_for_token)
     
-    triples = link_entities_svm(expressions, targets, holders, kaf_obj,my_config_manager)
-    kaf_obj.remove_opinion_layer()
+    triples = link_entities_svm(expressions, targets, holders, knaf_obj, my_config_manager)
+    knaf_obj.remove_opinion_layer()
+    
+    ##Up to here modified for KAF/NAF
     add_opinions_to_kaf(triples, kaf_obj,map_to_terms=False)   
     kaf_obj.addLinguisticProcessor('Deluxe opinion miner (CRF+SVM)',__version,'opinion', time_stamp=True)
     kaf_obj.saveToFile(sys.stdout)
