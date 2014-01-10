@@ -187,8 +187,6 @@ def link_entities_svm(expressions, targets, holders, knaf_obj,this_config_manage
     for exp_ids,exp_type in expressions:
         all_types.append(exp_type)
         exp_term_ids = map_tokens_to_terms(exp_ids, knaf_obj)
-        print exp_ids
-        print exp_term_ids
         all_exp_ids.append(exp_term_ids)
     
     for tar_ids, tar_type in targets:

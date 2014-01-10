@@ -12,16 +12,20 @@ from scripts.extract_features import extract_features_from_kaf_naf_file
 from scripts.crfutils import extract_features_to_crf 
 from scripts.link_entities_distance import link_entities_distance
 from scripts.relation_classifier import link_entities_svm
+from KafNafParserPy import *
 
 
 
 my_config_manager = Cconfig_manager()
 __this_folder = os.path.dirname(os.path.realpath(__file__))
 separator = '\t'
+__desc = 'Deluxe opinion miner (CRF+SVM)'
+__last_edited = '10jan2014'
 __version = '2.0'
 
 logging.basicConfig(stream=sys.stderr,format='%(asctime)s - %(levelname)s\n  + %(message)s', level=logging.CRITICAL)
 
+terms_for_token = None
 
 
 def load_obj_from_file(filename):
@@ -167,16 +171,32 @@ def detect_holders(tab_feat_file, list_token_ids):
     return matches_holder
               
               
-def map_tokens_to_terms(list_tokens,kaf_obj):
+
+
+
+def map_tokens_to_terms(list_tokens,knaf_obj):
+    global terms_for_token
+    if terms_for_token is None:
+        terms_for_token = {}
+        for term in knaf_obj.get_terms():
+            termid = term.get_id()
+            token_ids = term.get_span().get_span_ids()
+            for tokid in token_ids:
+                if tokid not in terms_for_token:
+                    terms_for_token[tokid] = [termid]
+                else:
+                    terms_for_token[tokid].append(termid)
+                    
     ret = set()
     for my_id in list_tokens:
-        term_ids = kaf_obj.get_term_ids_for_token_id(my_id)
+        term_ids = terms_for_token[my_id]
         ret |= set(term_ids)
     return sorted(list(ret))
         
         
               
-def add_opinions_to_kaf(triples,kaf_obj,map_to_terms=True):
+def add_opinions_to_knaf(triples,knaf_obj,map_to_terms=True):
+    num_opinion =  0
     for type_exp, span_exp, span_tar, span_hol in triples:
         #Map tokens to terms       
         if map_to_terms:
@@ -187,7 +207,37 @@ def add_opinions_to_kaf(triples,kaf_obj,map_to_terms=True):
             span_hol_terms = span_hol
             span_tar_terms = span_tar
             span_exp_terms = span_exp
-        kaf_obj.add_opinion(span_hol_terms,span_tar_terms,type_exp,'1',span_exp_terms)
+            
+        ##Creating holder
+        span_hol = Cspan()
+        span_hol.create_from_ids(span_hol_terms)
+        my_hol = Cholder()
+        my_hol.set_span(span_hol)
+        
+        #Creating target
+        span_tar = Cspan()
+        span_tar.create_from_ids(span_tar_terms)
+        my_tar = Ctarget()
+        my_tar.set_span(span_tar)
+        #########################
+
+        ##Creating expression
+        span_exp = Cspan()
+        span_exp.create_from_ids(span_exp_terms)
+        my_exp = Cexpression()
+        my_exp.set_span(span_exp)
+        my_exp.set_polarity(type_exp)
+        my_exp.set_strength("1")
+        #########################
+        
+        new_opinion = Copinion(type=knaf_obj.get_type())
+        new_opinion.set_id('o'+str(num_opinion+1))
+        new_opinion.set_holder(my_hol)
+        new_opinion.set_target(my_tar)
+        new_opinion.set_expression(my_exp)
+        num_opinion += 1
+        
+        knaf_obj.add_opinion(new_opinion)
         
         
 if __name__ == '__main__':
@@ -221,10 +271,15 @@ if __name__ == '__main__':
     triples = link_entities_svm(expressions, targets, holders, knaf_obj, my_config_manager)
     knaf_obj.remove_opinion_layer()
     
-    ##Up to here modified for KAF/NAF
-    add_opinions_to_kaf(triples, kaf_obj,map_to_terms=False)   
-    kaf_obj.addLinguisticProcessor('Deluxe opinion miner (CRF+SVM)',__version,'opinion', time_stamp=True)
-    kaf_obj.saveToFile(sys.stdout)
+    add_opinions_to_knaf(triples, knaf_obj,map_to_terms=False)   
+    
+    #Adding linguistic processor
+    my_lp = Clp()
+    my_lp.set_name(__desc)
+    my_lp.set_version(__last_edited+'_'+__version)
+    my_lp.set_timestamp()   ##Set to the current date and time
+    knaf_obj.add_linguistic_processor('opinions',my_lp)
+    knaf_obj.dump(sys.stdout)
     sys.exit(0)
     
     
