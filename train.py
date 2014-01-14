@@ -16,7 +16,8 @@ from scripts.extract_features import extract_features_from_kaf_naf_file
 from scripts.crfutils import extract_features_to_crf    
 from scripts.extract_feats_relations import create_rel_exp_tar_training, create_rel_exp_hol_training
 from VUA_pylib.io import Cfeature_file, Cfeature_index
-from VUA_pylib.lexicon import MPQA_subjectivity_lexicon
+from KafNafParserPy import KafNafParser
+
 
 
 #Globa configuration
@@ -108,8 +109,7 @@ def extract_all_features():
     rel_exp_hol_filename = my_config_manager.get_relation_exp_hol_training_filename()
     exp_hol_rel_fic = open(rel_exp_hol_filename,'w') 
     
-    my_mpqa_subj_lex = MPQA_subjectivity_lexicon()
-    
+      
     accepted_opinions = my_config_manager.get_mapping_valid_opinions()
     
     for num_file, train_file in enumerate(train_files):
@@ -120,15 +120,19 @@ def extract_all_features():
         
         #Creates the output file
         # Returns the labels for the features and the separator used
-        try:
-            label_feats, separator, kaf_naf_obj = extract_features_from_kaf_naf_file(train_file,out_file,err_file,mpqa_sub_lex=my_mpqa_subj_lex, accepted_opinions=accepted_opinions)
+        if True:
+            kaf_naf_obj = KafNafParser(train_file)
+            
+            label_feats, separator = extract_features_from_kaf_naf_file(kaf_naf_obj,out_file,err_file, accepted_opinions=accepted_opinions)
             print>>exp_tar_rel_fic,'#'+train_file
+            print>>exp_hol_rel_fic,'#'+train_file
             # SET valid_opinions to None to use all the possible opinions in the KAF file for extracitng relations 
             create_rel_exp_tar_training(kaf_naf_obj, output=exp_tar_rel_fic, valid_opinions=accepted_opinions)
-            create_rel_exp_hol_training(kaf_naf_obj ,output=exp_hol_rel_fic, valid_opinions=accepted_opinions)
-        except Exception as e:
+            create_rel_exp_hol_training(kaf_naf_obj ,output=exp_hol_rel_fic, valid_opinions=accepted_opinions) 
+        if False:
+        #except Exception as e:
             sys.stdout, sys.stderr = my_stdout, my_stderr
-            print>>sys.stderr,str(e)
+            print>>sys.stderr,str(e),dir(e)
             pass
         
     #Re-set the stdout and stderr
@@ -159,11 +163,11 @@ def train_expression_classifier():
        
     crf_out_files = []
     templates = (
-        (('token',-2),), (('lemma',-2),), (('pos',-2),),(('pol/mod',-2),),(('mpqa_subjectivity',-2),),(('mpqa_polarity',-2),),
-        (('token',-1),), (('lemma',-1),), (('pos',-1),),(('pol/mod',-1),),(('mpqa_subjectivity',-1),),(('mpqa_polarity',-1),),
-        (('token',0),), (('lemma',0),), (('pos',0),),(('pol/mod',0),),(('mpqa_subjectivity',0),),(('mpqa_polarity',0),),
-        (('token',1),), (('lemma',1),), (('pos',1),),(('pol/mod',1),),(('mpqa_subjectivity',1),),(('mpqa_polarity',+1),),
-        (('token',2),), (('lemma',2),), (('pos',2),),(('pol/mod',2),),(('mpqa_subjectivity',2),),(('mpqa_polarity',+2),),
+        (('token',-2),), (('lemma',-2),), (('pos',-2),),(('pol/mod',-2),),(('mpqa_subjectivity',-2),),(('mpqa_polarity',-2),),#(('phrase_type',-2),),
+        (('token',-1),), (('lemma',-1),), (('pos',-1),),(('pol/mod',-1),),(('mpqa_subjectivity',-1),),(('mpqa_polarity',-1),),(('phrase_type',-1),),
+        (('token',+0),), (('lemma',+0),), (('pos',+0),),(('pol/mod',+0),),(('mpqa_subjectivity',+0),),(('mpqa_polarity',+0),),(('phrase_type',+0),),
+        (('token',+1),), (('lemma',+1),), (('pos',+1),),(('pol/mod',+1),),(('mpqa_subjectivity',+1),),(('mpqa_polarity',+1),),(('phrase_type',+1),),
+        (('token',+2),), (('lemma',+2),), (('pos',+2),),(('pol/mod',+2),),(('mpqa_subjectivity',+2),),(('mpqa_polarity',+2),),#(('phrase_type',+2),),
     ) 
     possible_classes = my_config_manager.get_possible_expression_values()
     template_filename = my_config_manager.get_expression_template_filename()
@@ -217,11 +221,11 @@ def train_target_classifier():
     # Create all the CRF files calling to the crfutils.extract_features_to_crf    
     crf_out_files = []
     templates = (
-                     (('token',-2),), (('lemma',-2),), (('pos',-2),), (('entity',-2),), (('property',-2),),
-                     (('token',-1),), (('lemma',-1),), (('pos',-1),), (('entity',-1),), (('property',-1),),
-                     (('token',+0),), (('lemma',+0),), (('pos',+0),), (('entity',+0),), (('property',+0),),
-                     (('token',+1),), (('lemma',+1),), (('pos',+1),), (('entity',+1),), (('property',+1),),
-                     (('token',+2),), (('lemma',+2),), (('pos',+2),), (('entity',+2),), (('property',+2),),
+                     (('token',-2),), (('lemma',-2),), (('pos',-2),), (('entity',-2),), (('property',-2),),#(('phrase_type',-2),),
+                     (('token',-1),), (('lemma',-1),), (('pos',-1),), (('entity',-1),), (('property',-1),),(('phrase_type',-1),),
+                     (('token',+0),), (('lemma',+0),), (('pos',+0),), (('entity',+0),), (('property',+0),),(('phrase_type',+0),),
+                     (('token',+1),), (('lemma',+1),), (('pos',+1),), (('entity',+1),), (('property',+1),),(('phrase_type',+1),),
+                     (('token',+2),), (('lemma',+2),), (('pos',+2),), (('entity',+2),), (('property',+2),),#(('phrase_type',+2),),
         )
     possible_classes = ['target']
     template_filename = my_config_manager.get_target_template_filename()
@@ -273,11 +277,11 @@ def train_holder_classifier():
     # Create all the CRF files calling to the crfutils.extract_features_to_crf    
     crf_out_files = []
     templates = (
-                     (('token',-2),), (('lemma',-2),), (('pos',-2),), (('entity',-2),), (('property',-2),),
-                     (('token',-1),), (('lemma',-1),), (('pos',-1),), (('entity',-1),), (('property',-1),),
-                     (('token',+0),), (('lemma',+0),), (('pos',+0),), (('entity',+0),), (('property',+0),),
-                     (('token',+1),), (('lemma',+1),), (('pos',+1),), (('entity',+1),), (('property',+1),),
-                     (('token',+2),), (('lemma',+2),), (('pos',+2),), (('entity',+2),), (('property',+2),),
+                     (('token',-2),), (('lemma',-2),), (('pos',-2),), (('entity',-2),), (('property',-2),),#(('phrase_type',-2),),
+                     (('token',-1),), (('lemma',-1),), (('pos',-1),), (('entity',-1),), (('property',-1),),(('phrase_type',-1),),
+                     (('token',+0),), (('lemma',+0),), (('pos',+0),), (('entity',+0),), (('property',+0),),(('phrase_type',+0),),
+                     (('token',+1),), (('lemma',+1),), (('pos',+1),), (('entity',+1),), (('property',+1),),(('phrase_type',+1),),
+                     (('token',+2),), (('lemma',+2),), (('pos',+2),), (('entity',+2),), (('property',+2),),#(('phrase_type',+2),),
         )
     possible_classes = ['holder']
     template_filename = my_config_manager.get_holder_template_filename()

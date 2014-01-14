@@ -74,6 +74,30 @@ def extract_feats_exp_tar(exp_ids,tar_ids,knaf_obj):
 
             if sentence_for_tar is None:
                 sentence_for_tar = sent_id
+    
+    ## Dependency relations
+    dependency_extractor = knaf_obj.get_dependency_extractor()
+    if dependency_extractor is not None:
+        #For expression
+        deps_from_exp_to_root = dependency_extractor.get_shortest_path_to_root_span(exp_ids)
+        if deps_from_exp_to_root is not None:
+            if len(deps_from_exp_to_root) == 0:  #one term is the root of the sentence
+                deps_from_exp_to_root = ['IS_ROOT']
+        
+            feats_for_exp.append(('first-dependency-exp',deps_from_exp_to_root[0]))
+            feats_for_exp.append(('chain-dependency-exp','#'.join(deps_from_exp_to_root)))
+    
+        ##For target
+        deps_from_tar_to_root = dependency_extractor.get_shortest_path_to_root_span(tar_ids)
+        if deps_from_tar_to_root is not None:
+            if len(deps_from_tar_to_root) == 0:
+                deps_from_tar_to_root = ['IS_ROOT']
+            
+            feats_for_tar.append(('first-dependency-tar',deps_from_tar_to_root[0]))
+            feats_for_tar.append(('chain-dependency-tar','#'.join(deps_from_tar_to_root))) 
+    
+    ## EXTRA FEATURES
+    ## This will be used to establish a relation between expression and target, it is not a feature for one single entity
     avg_position_tar = avg_position_tar * 1.0 / n_toks  
     
     extra_feats_exp = {}
@@ -124,6 +148,7 @@ def get_extra_feats_exp_tar(extra_e, extra_t):
     
 def create_rel_exp_tar_training(knaf_obj, output=sys.stdout, valid_opinions=None):
     
+   
     # Obtain pairs of features for Expression and Target
     pairs = [] # [(Exp,Tar), (E,T), (E,T)....]
     for opinion in knaf_obj.get_opinions():
@@ -163,8 +188,7 @@ def create_rel_exp_tar_training(knaf_obj, output=sys.stdout, valid_opinions=None
         for idx2, (e2, t2, extra_e2, extra_t2) in enumerate(pairs):
             if idx1 != idx2:
                 extra_feats2 = get_extra_feats_exp_tar(extra_e1, extra_t2)
-                write_to_output('-1', e1, t2,extra_feats2, output)
-              
+                write_to_output('-1', e1, t2,extra_feats2, output)              
     
 
 
@@ -258,6 +282,30 @@ def extract_feats_exp_hol(exp_ids,hol_ids,knaf_obj):
             if sentence_for_hol is None:
                 sentence_for_hol = sent_id
                 
+                
+    ## Dependency relations
+    dependency_extractor = knaf_obj.get_dependency_extractor()
+    #For expression
+    if dependency_extractor is not None:
+        deps_from_exp_to_root = dependency_extractor.get_shortest_path_to_root_span(exp_ids)
+        if deps_from_exp_to_root is not None:
+            if len(deps_from_exp_to_root) == 0:  #one term is the root of the sentence
+                deps_from_exp_to_root = ['IS_ROOT']
+        
+            feats_for_exp.append(('first-dependency-exp',deps_from_exp_to_root[0]))
+            feats_for_exp.append(('chain-dependency-exp','#'.join(deps_from_exp_to_root)))
+    
+        ##For HOLDER
+        deps_from_hol_to_root = dependency_extractor.get_shortest_path_to_root_span(hol_ids)
+        if deps_from_hol_to_root is not None:
+            if len(deps_from_hol_to_root) == 0:
+                deps_from_hol_to_root = ['IS_ROOT']
+            
+            feats_for_hol.append(('first-dependency-hol',deps_from_hol_to_root[0]))
+            feats_for_hol.append(('chain-dependency-hol','#'.join(deps_from_hol_to_root))) 
+    #################        
+            
+             
     avg_position_hol = avg_position_hol * 1.0 / n_toks 
     
     extra_feats_exp = {}
@@ -272,6 +320,8 @@ def extract_feats_exp_hol(exp_ids,hol_ids,knaf_obj):
                 
     
 def create_rel_exp_hol_training(knaf_obj, output=sys.stdout, valid_opinions=None):
+    
+   
     
     # Obtain pairs of features for Expression and Holder
     pairs = [] # [(Exp,Hol), (E,H), (E,H)....]
@@ -310,5 +360,6 @@ def create_rel_exp_hol_training(knaf_obj, output=sys.stdout, valid_opinions=None
             if idx1 != idx2:
                 extra_feats2 = get_extra_feats_exp_hol(extra_e1, extra_h2)
                 write_to_output('-1', e1, h2,extra_feats2,output)
+    #return dependency_extractor
     
     

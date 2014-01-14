@@ -75,15 +75,15 @@ def match_crfsuite_out(crfout,list_token_ids):
     return matches
 
 
-def extract_features(knaf_data):
+def extract_features(kaf_naf_obj):
     feat_file_desc = NamedTemporaryFile(delete=False)
     feat_file_desc.close()
     
     out_file = feat_file_desc.name
     err_file = out_file+'.log'
     
-    labels, separator, knaf_obj = extract_features_from_kaf_naf_file(knaf_data,out_file,err_file,include_class=False)
-    return out_file, err_file, knaf_obj
+    labels, separator = extract_features_from_kaf_naf_file(kaf_naf_obj,out_file,err_file,include_class=False)
+    return out_file, err_file
              
             
 def convert_to_crf(input_file,templates):
@@ -127,6 +127,7 @@ def detect_expressions(tab_feat_file,list_token_ids):
     logging.debug('File with crf format for EXPRESSIONS '+crf_exp_file)
     model_file = my_config_manager.get_filename_model_expression()
     output_crf,error_crf = run_crfsuite_tag(crf_exp_file,model_file)
+    print>>sys.stderr,crf_exp_file
     logging.debug('Expressions crf error: '+error_crf)
     matches_exp = match_crfsuite_out(output_crf, list_token_ids)
     logging.debug('Detector expressions out: '+str(matches_exp))
@@ -232,8 +233,12 @@ def add_opinions_to_knaf(triples,knaf_obj,map_to_terms=True):
         
         new_opinion = Copinion(type=knaf_obj.get_type())
         new_opinion.set_id('o'+str(num_opinion+1))
-        new_opinion.set_holder(my_hol)
-        new_opinion.set_target(my_tar)
+        if len(span_hol_terms) != 0:    #To avoid empty holders
+            new_opinion.set_holder(my_hol)
+            
+        if len(span_tar_terms) != 0:    #To avoid empty targets
+            new_opinion.set_target(my_tar)
+            
         new_opinion.set_expression(my_exp)
         num_opinion += 1
         
@@ -245,9 +250,11 @@ if __name__ == '__main__':
     my_config_manager.set_current_folder(__this_folder)
     my_config_manager.set_config(config_file)
     
-   
+    
+    knaf_obj = KafNafParser(sys.stdin)
     #Create a temporary file
-    out_feat_file, err_feat_file, knaf_obj = extract_features(sys.stdin)
+    out_feat_file, err_feat_file = extract_features(knaf_obj)
+    #print>>sys.stderr,'Feat file',out_feat_file
     
     #get all the tokens in order
     list_token_ids = []
@@ -262,8 +269,11 @@ if __name__ == '__main__':
 
        
     expressions = detect_expressions(out_feat_file,list_token_ids)
+    print>>sys.stderr,"Expressions:",expressions
     targets = detect_targets(out_feat_file, list_token_ids)
+    print>>sys.stderr,'Target',targets
     holders = detect_holders(out_feat_file, list_token_ids)
+    print>>sys.stderr,'Holders',holders
     
     # Entity linker based on distances
     ####triples = link_entities_distance(expressions,targets,holders,sentence_for_token)

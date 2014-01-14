@@ -3,7 +3,6 @@
 import sys
 from operator import itemgetter
 
-from KafNafParserPy import KafNafParser
 from VUA_pylib.lexicon import MPQA_subjectivity_lexicon
 
 
@@ -16,8 +15,8 @@ def get_first_term_id(token_data,term_data,this_ids):
     vector_tid_pos.sort(key=itemgetter(1))
     return vector_tid_pos[0][0]
 
-def extract_features_from_kaf_naf_file(xml_filename,out_file=None,err_file=None,include_class=True,mpqa_sub_lex=None,accepted_opinions=None):
-    labels = ['sentence_id','token_id','token','lemma','pos','term_id','pol/mod','mpqa_subjectivity','mpqa_polarity','entity','property','y']
+def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,err_file=None,include_class=True,accepted_opinions=None):
+    labels = ['sentence_id','token_id','token','lemma','pos','term_id','pol/mod','mpqa_subjectivity','mpqa_polarity','entity','property','phrase_type','y']
 
     separator = '\t'
     restore_err = None
@@ -33,8 +32,8 @@ def extract_features_from_kaf_naf_file(xml_filename,out_file=None,err_file=None,
             
         
     
-    print>>sys.stderr,'Extracting features from ',xml_filename
-    knaf_obj = KafNafParser(xml_filename)
+    print>>sys.stderr,'Extracting features from ',knaf_obj.get_filename()
+    
     
     
     ###########################
@@ -193,7 +192,10 @@ def extract_features_from_kaf_naf_file(xml_filename,out_file=None,err_file=None,
                     class_for_term_id[t_id]=type+'holder'    
         ##############
             
+            
+    my_mpqa_subj_lex = MPQA_subjectivity_lexicon()
     ## WRITE TO THE OUTPUT
+    
    
     prev_sent = None
     for token_id in tokens_in_order:
@@ -210,13 +212,33 @@ def extract_features_from_kaf_naf_file(xml_filename,out_file=None,err_file=None,
                 
                 #Mpqa subjectivy from the mpqa corpus
                 mpqa_type = mpqa_pol = '-'
-                if mpqa_sub_lex is not None:
-                    mpqa_data = mpqa_sub_lex.get_type_and_polarity(token,term_pos)
+                if my_mpqa_subj_lex is not None:
+                    mpqa_data = my_mpqa_subj_lex.get_type_and_polarity(token,term_pos)
                     if mpqa_data is not None:
                         mpqa_type, mpqa_pol = mpqa_data
                                   
+                                
+                                
+                ## Constituency features
+                constituency_extractor = knaf_obj.get_constituency_extractor()
+                feature_phrase = 'XXX'
+                if constituency_extractor is not None:
+                    this_phrase, subsumed_together = constituency_extractor.get_deepest_phrase_for_termid(term_id)
+                    if this_phrase is not None:
+                        feature_phrase = this_phrase
+                ######################
+                                  
+                ##############################################################################################
+                ## FEATURE GENERATION!!!!
+                ##############################################################################################
+                
                 features = [sentence_id,token_id,token,term_lemma,term_pos,term_id, polarity]
-                features.extend([mpqa_type, mpqa_pol, entity,property,this_class])
+                features.extend([mpqa_type, mpqa_pol, entity,property,feature_phrase,this_class])
+                
+                ##############################################################################################
+                ##############################################################################################
+                
+                
         if prev_sent is not None and sentence_id != prev_sent: print>>sys.stdout    #breakline 
         print>>sys.stdout,separator.join(features)
         
@@ -232,5 +254,5 @@ def extract_features_from_kaf_naf_file(xml_filename,out_file=None,err_file=None,
     if restore_out is not None:
         sys.stdout.close()
         sys.stdout = restore_out
-    return labels, separator, knaf_obj
+    return labels, separator
 
