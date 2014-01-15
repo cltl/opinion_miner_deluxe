@@ -127,7 +127,6 @@ def detect_expressions(tab_feat_file,list_token_ids):
     logging.debug('File with crf format for EXPRESSIONS '+crf_exp_file)
     model_file = my_config_manager.get_filename_model_expression()
     output_crf,error_crf = run_crfsuite_tag(crf_exp_file,model_file)
-    print>>sys.stderr,crf_exp_file
     logging.debug('Expressions crf error: '+error_crf)
     matches_exp = match_crfsuite_out(output_crf, list_token_ids)
     logging.debug('Detector expressions out: '+str(matches_exp))
@@ -254,7 +253,6 @@ if __name__ == '__main__':
     knaf_obj = KafNafParser(sys.stdin)
     #Create a temporary file
     out_feat_file, err_feat_file = extract_features(knaf_obj)
-    print>>sys.stderr,'Feat file',out_feat_file
     
     #get all the tokens in order
     list_token_ids = []
