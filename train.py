@@ -23,7 +23,7 @@ from KafNafParserPy import KafNafParser
 #Globa configuration
 my_config_manager = Cconfig_manager()
 
-logging.basicConfig(stream=sys.stderr,format='%(asctime)s - %(levelname)s\n  + %(message)s', level=logging.DEBUG)
+logging.basicConfig(stream=sys.stderr,format='%(asctime)s - %(levelname)s\n %(message)s', level=logging.DEBUG)
 __this_folder = os.path.dirname(os.path.realpath(__file__))
 
 
@@ -113,7 +113,7 @@ def extract_all_features():
     accepted_opinions = my_config_manager.get_mapping_valid_opinions()
     
     for num_file, train_file in enumerate(train_files):
-        logging.debug('Processing '+train_file)
+        logging.debug('Extracting features '+os.path.basename(train_file))
         base_name = os.path.basename(train_file)
         out_file = os.path.join(feat_folder,'file#'+str(num_file)+'#'+base_name+".feat")
         err_file = out_file+'.log'

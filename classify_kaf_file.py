@@ -254,7 +254,7 @@ if __name__ == '__main__':
     knaf_obj = KafNafParser(sys.stdin)
     #Create a temporary file
     out_feat_file, err_feat_file = extract_features(knaf_obj)
-    #print>>sys.stderr,'Feat file',out_feat_file
+    print>>sys.stderr,'Feat file',out_feat_file
     
     #get all the tokens in order
     list_token_ids = []
@@ -269,11 +269,11 @@ if __name__ == '__main__':
 
        
     expressions = detect_expressions(out_feat_file,list_token_ids)
-    print>>sys.stderr,"Expressions:",expressions
+    #print>>sys.stderr,"Expressions:",expressions
     targets = detect_targets(out_feat_file, list_token_ids)
-    print>>sys.stderr,'Target',targets
+    #print>>sys.stderr,'Target',targets
     holders = detect_holders(out_feat_file, list_token_ids)
-    print>>sys.stderr,'Holders',holders
+    #print>>sys.stderr,'Holders',holders
     
     # Entity linker based on distances
     ####triples = link_entities_distance(expressions,targets,holders,sentence_for_token)

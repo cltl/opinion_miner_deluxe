@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import sys
+import codecs
 from operator import itemgetter
 
 from VUA_pylib.lexicon import MPQA_subjectivity_lexicon
@@ -15,16 +16,16 @@ def get_first_term_id(token_data,term_data,this_ids):
     vector_tid_pos.sort(key=itemgetter(1))
     return vector_tid_pos[0][0]
 
-def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,err_file=None,include_class=True,accepted_opinions=None):
+def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,log_file=None,include_class=True,accepted_opinions=None):
     labels = ['sentence_id','token_id','token','lemma','pos','term_id','pol/mod','mpqa_subjectivity','mpqa_polarity','entity','property','phrase_type','y']
 
     separator = '\t'
-    restore_err = None
     restore_out = None
+    log_on = False
     
-    if err_file is not None:
-        restore_err = sys.stderr
-        sys.stderr = open(err_file,'w')
+    if log_file is not None:
+        log_desc = codecs.open(log_file, 'w', encoding='UTF-8')
+        log_on = True
     
     if out_file is not None:
         restore_out = sys.stdout
@@ -32,7 +33,7 @@ def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,err_file=None,incl
             
         
     
-    print>>sys.stderr,'Extracting features from ',knaf_obj.get_filename()
+    print>>log_desc,'Extracting features from ',knaf_obj.get_filename()
     
     
     
@@ -48,7 +49,8 @@ def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,err_file=None,incl
         token_data[w_id] = (token,s_id,num_token)
         tokens_in_order.append(w_id)
         num_token += 1
-    print>>sys.stderr,'  Number of tokens: ',len(tokens_in_order)
+    if log_on:
+        print>>log_desc,'  Number of tokens: ',len(tokens_in_order)
     ###########################
 
     
@@ -83,7 +85,8 @@ def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,err_file=None,incl
             term_for_token[tok_id] = term_id
         sentence_id = token_data[tok_id][1]
         sentence_for_term[term_id] = sentence_id
-    print>>sys.stderr,'  Number of terms loaded: '+str(len(term_data))
+    if log_on:
+        print>>log_desc,'  Number of terms loaded: '+str(len(term_data))
     ###########################
     
     ###########################
@@ -96,7 +99,8 @@ def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,err_file=None,incl
             for span_obj in reference_obj:
                 for t_id in span_obj.get_span_ids():
                     entity_for_term[t_id] = ent_type
-    print>>sys.stderr,'Entities:'+str(entity_for_term)
+    if log_on:
+        print>>log_desc,'Entities:'+str(entity_for_term)
 
     ###########################
     # EXTRACTING PROPERTIES FOR EACH TERM
@@ -108,7 +112,8 @@ def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,err_file=None,incl
             for span_obj in reference_obj:
                 for t_id in span_obj.get_span_ids():
                     property_for_term[t_id] = prop_type
-    print>>sys.stderr,'Properties:'+str(property_for_term)
+    if log_on:
+        print>>log_desc,'Properties:'+str(property_for_term)
 
     ###########################
     # EXTRACTING CLASS FOR EACH TERM
@@ -156,10 +161,12 @@ def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,err_file=None,incl
                 mapped_type = exp_type
             
             
-            print>>sys.stderr,'  Opinion',opinion_id
-            print>>sys.stderr,'    Expression:'
-            print>>sys.stderr,'      ids:',exp_ids
-            print>>sys.stderr,'      terms:',[term_data[i][0] for i in exp_ids]
+            if log_on:
+                print>>log_desc,'  Opinion',opinion_id
+                print>>log_desc,'    Expression:'
+                print>>log_desc,'      ids:',exp_ids
+                print>>log_desc,'      terms:',[term_data[i][0] for i in exp_ids]
+                
             if len(exp_ids) != 0:
                 first_term_id = get_first_term_id(token_data,term_data,exp_ids)
                 for t_id in exp_ids:
@@ -169,10 +176,11 @@ def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,err_file=None,incl
                     
             
             
-            
-            print>>sys.stderr,'    Target:'
-            print>>sys.stderr,'      ids:',tar_ids
-            print>>sys.stderr,'      terms:',[term_data[i][0] for i in tar_ids]
+            if log_on:
+                print>>log_desc,'    Target:'
+                print>>log_desc,'      ids:',tar_ids
+                print>>log_desc,'      terms:',[term_data[i][0] for i in tar_ids]
+                
             if len(tar_ids) != 0:
                 first_term_id = get_first_term_id(token_data,term_data,tar_ids)
                 for t_id in tar_ids:
@@ -180,10 +188,11 @@ def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,err_file=None,incl
                     else:  type='I-'
                     class_for_term_id[t_id]=type+'target'        
             
-            
-            print>>sys.stderr,'    Holder:'
-            print>>sys.stderr,'      ids:',hol_ids
-            print>>sys.stderr,'      terms:',[term_data[i][0] for i in hol_ids]
+            if log_on:
+                print>>log_desc,'    Holder:'
+                print>>log_desc,'      ids:',hol_ids
+                print>>log_desc,'      terms:',[term_data[i][0] for i in hol_ids]
+                
             if len(hol_ids) != 0:
                 first_term_id = get_first_term_id(token_data,term_data,hol_ids)
                 for t_id in hol_ids:
@@ -240,19 +249,20 @@ def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,err_file=None,incl
                 
                 
         if prev_sent is not None and sentence_id != prev_sent: print>>sys.stdout    #breakline 
-        print>>sys.stdout,separator.join(features)
+        print>>sys.stdout,(separator.join(features)).encode('utf-8')
         
         prev_sent=sentence_id
     print>>sys.stdout   #Last breakline required for crfsuite
     
 
-    print>>sys.stderr
+    print>>log_desc
     ## Restoring
-    if restore_err is not None:
-        sys.stderr.close()
-        sys.stderr = restore_err
+    if log_on:
+        log_desc.close()
+
     if restore_out is not None:
         sys.stdout.close()
         sys.stdout = restore_out
+        
     return labels, separator
 

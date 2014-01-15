@@ -296,6 +296,7 @@ def extract_feats_exp_hol(exp_ids,hol_ids,knaf_obj):
             feats_for_exp.append(('chain-dependency-exp','#'.join(deps_from_exp_to_root)))
     
         ##For HOLDER
+        #print>>sys.stderr,'HOL_IDS', hol_ids
         deps_from_hol_to_root = dependency_extractor.get_shortest_path_to_root_span(hol_ids)
         if deps_from_hol_to_root is not None:
             if len(deps_from_hol_to_root) == 0:
