@@ -1,12 +1,34 @@
 import os
 import ConfigParser
+import shutil
 
+def load_templates_from_file(filename):
+    templates = []
+    fic = open(filename,'r')
+    for line in fic:
+        line = line.strip()
+        if line != '' and line[0]!='#': #Not empty lines or starting with #
+            tokens = line.split(' ')
+            my_len = int(tokens[0])
+            labels = tokens[1:my_len+1]
+            values = tokens[my_len+1:]
+            for value in values:
+                new_template = []
+                single_values = value.split('/')
+                for n in range(len(labels)):
+                    new_template.append((labels[n],int(single_values[n])))
+                templates.append(new_template)
+    fic.close()
+    return templates
 
 class Cconfig_manager:
     def __init__(self):
         self.config = ConfigParser.ConfigParser()
         self.out_folder = None
         self.this_folder = None
+        self.templates_expr = None
+        self.templates_holder = None
+        self.templates_target = None 
         
     def set_current_folder(self,t):
         self.this_folder = t
@@ -47,6 +69,62 @@ class Cconfig_manager:
         return os.path.join(self.get_training_datasets_folder(),my_name)  
     
     
+    ## FEATURE TEMPLATES
+    def get_feature_template_folder_name(self):
+        my_name = 'feature_templates'
+        return os.path.join(self.get_output_folder(),my_name)  
+    
+    def get_feature_template_exp_name(self):
+        my_name = 'feat_template_expr.txt'
+        return os.path.join(self.get_feature_template_folder_name(),my_name) 
+
+    def get_feature_template_tar_name(self):
+        my_name = 'feat_template_target.txt'
+        return os.path.join(self.get_feature_template_folder_name(),my_name) 
+
+    def get_feature_template_hol_name(self):
+        my_name = 'feat_template_holder.txt'
+        return os.path.join(self.get_feature_template_folder_name(),my_name)     
+    
+    def copy_feature_templates(self):
+        #Exp
+        temp_exp_orig = self.config.get('feature_templates','expression')
+        temp_exp_target = self.get_feature_template_exp_name()
+        if not os.path.isabs(temp_exp_orig):
+            temp_exp_orig = os.path.join(self.this_folder,temp_exp_orig)
+        shutil.copyfile(temp_exp_orig, temp_exp_target)
+
+        temp_tar_orig = self.config.get('feature_templates','target')
+        temp_tar_target = self.get_feature_template_tar_name()
+        if not os.path.isabs(temp_tar_orig):
+            temp_tar_orig = os.path.join(self.this_folder,temp_tar_orig)
+        shutil.copyfile(temp_tar_orig, temp_tar_target)
+
+        temp_hol_orig = self.config.get('feature_templates','holder')
+        temp_hol_target = self.get_feature_template_hol_name()
+        if not os.path.isabs(temp_hol_orig):
+            temp_hol_orig = os.path.join(self.this_folder,temp_hol_orig)
+        shutil.copyfile(temp_hol_orig, temp_hol_target)
+
+    def get_templates_expr(self):
+        if self.templates_expr is None:
+            filename_template = self.get_feature_template_exp_name()
+            self.templates_expr = load_templates_from_file(filename_template)
+        return self.templates_expr
+
+    def get_templates_holder(self):
+        if self.templates_holder is None:
+            filename_template = self.get_feature_template_hol_name()
+            self.templates_holder = load_templates_from_file(filename_template)
+        return self.templates_holder
+    
+    def get_templates_target(self):
+        if self.templates_target is None:
+            filename_template = self.get_feature_template_tar_name()
+            self.templates_target = load_templates_from_file(filename_template)
+        return self.templates_target    
+    
+    ###############
     def get_feature_folder_name(self):
         subfolder_feats = 'tab_feature_files'  
         out_folder = self.get_output_folder()
@@ -125,19 +203,7 @@ class Cconfig_manager:
     def get_filename_model_holder(self):
         my_name = 'model_opi_holder.crf'
         return os.path.join(self.get_model_foldername(),my_name)     
-    
-    def get_expression_template_filename(self):           
-        my_name = 'template_crf_expression.bin'
-        return os.path.join(self.out_folder,my_name)
-    
-    def get_target_template_filename(self):           
-        my_name = 'template_crf_target.bin'
-        return os.path.join(self.out_folder,my_name)
-
-    def get_holder_template_filename(self):           
-        my_name = 'template_crf_holder.bin'
-        return os.path.join(self.out_folder,my_name)    
-    
+     
     def get_folder_relation_classifier(self):
         my_name = 'relation_classifier'
         return os.path.join(self.out_folder,my_name)

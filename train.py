@@ -73,6 +73,14 @@ def create_folders():
     relation_folder = my_config_manager.get_folder_relation_classifier()
     os.mkdir(relation_folder)
     logging.debug('Created '+relation_folder)
+    
+    ##Templates folder
+    template_folder = my_config_manager.get_feature_template_folder_name()
+    os.mkdir(template_folder)
+    logging.debug('Created '+template_folder)
+    
+    ##Copy template files
+    my_config_manager.copy_feature_templates()
 
 
 def load_training_files():
@@ -162,17 +170,10 @@ def train_expression_classifier():
     # Create all the CRF files calling to the crfutils.extract_features_to_crf 
        
     crf_out_files = []
-    templates = (
-        (('token',-2),), (('lemma',-2),), (('pos',-2),),(('pol/mod',-2),),(('mpqa_subjectivity',-2),),(('mpqa_polarity',-2),),#(('phrase_type',-2),),
-        (('token',-1),), (('lemma',-1),), (('pos',-1),),(('pol/mod',-1),),(('mpqa_subjectivity',-1),),(('mpqa_polarity',-1),),(('phrase_type',-1),),
-        (('token',+0),), (('lemma',+0),), (('pos',+0),),(('pol/mod',+0),),(('mpqa_subjectivity',+0),),(('mpqa_polarity',+0),),(('phrase_type',+0),),
-        (('token',+1),), (('lemma',+1),), (('pos',+1),),(('pol/mod',+1),),(('mpqa_subjectivity',+1),),(('mpqa_polarity',+1),),(('phrase_type',+1),),
-        (('token',+2),), (('lemma',+2),), (('pos',+2),),(('pol/mod',+2),),(('mpqa_subjectivity',+2),),(('mpqa_polarity',+2),),#(('phrase_type',+2),),
-    ) 
-    possible_classes = my_config_manager.get_possible_expression_values()
-    template_filename = my_config_manager.get_expression_template_filename()
-    save_obj_to_file(templates,template_filename)
     
+    templates_exp = my_config_manager.get_templates_expr() 
+    possible_classes = my_config_manager.get_possible_expression_values()
+      
     # Only set the target class for the tokens of possible_classes
     # For others, it's set to O (out sequence)
     for feat_file in glob.glob(feat_folder+'/*.feat'):
@@ -182,7 +183,7 @@ def train_expression_classifier():
         logging.debug('Creating crf file in --> '+out_crf)
         
         try:
-            extract_features_to_crf(feat_file,out_crf,fields,separator,templates,possible_classes)
+            extract_features_to_crf(feat_file,out_crf,fields,separator,templates_exp,possible_classes)
             crf_out_files.append(out_crf)
         except:
             print>>sys.stderr,'Failed conversion to tab-expression -> CRF: ',feat_file
@@ -220,16 +221,8 @@ def train_target_classifier():
     crf_folder = my_config_manager.get_crf_target_folder()
     # Create all the CRF files calling to the crfutils.extract_features_to_crf    
     crf_out_files = []
-    templates = (
-                     (('token',-2),), (('lemma',-2),), (('pos',-2),), (('entity',-2),), (('property',-2),),#(('phrase_type',-2),),
-                     (('token',-1),), (('lemma',-1),), (('pos',-1),), (('entity',-1),), (('property',-1),),(('phrase_type',-1),),
-                     (('token',+0),), (('lemma',+0),), (('pos',+0),), (('entity',+0),), (('property',+0),),(('phrase_type',+0),),
-                     (('token',+1),), (('lemma',+1),), (('pos',+1),), (('entity',+1),), (('property',+1),),(('phrase_type',+1),),
-                     (('token',+2),), (('lemma',+2),), (('pos',+2),), (('entity',+2),), (('property',+2),),#(('phrase_type',+2),),
-        )
+    templates_target = my_config_manager.get_templates_target()
     possible_classes = ['target']
-    template_filename = my_config_manager.get_target_template_filename()
-    save_obj_to_file(templates,template_filename)
     for feat_file in glob.glob(feat_folder+'/*.feat'):
         base_name = os.path.basename(feat_file)
         base_name = base_name[:-5]
@@ -237,7 +230,7 @@ def train_target_classifier():
         logging.debug('Creating crf file in --> '+out_crf)
         
         try:
-            extract_features_to_crf(feat_file,out_crf,fields,separator,templates,possible_classes)
+            extract_features_to_crf(feat_file,out_crf,fields,separator,templates_target,possible_classes)
             crf_out_files.append(out_crf)
         except:
             print>>sys.stderr,'Failed conversion to tab-target-> CRF: ',feat_file
@@ -276,16 +269,8 @@ def train_holder_classifier():
     crf_folder = my_config_manager.get_crf_holder_folder()
     # Create all the CRF files calling to the crfutils.extract_features_to_crf    
     crf_out_files = []
-    templates = (
-                     (('token',-2),), (('lemma',-2),), (('pos',-2),), (('entity',-2),), (('property',-2),),#(('phrase_type',-2),),
-                     (('token',-1),), (('lemma',-1),), (('pos',-1),), (('entity',-1),), (('property',-1),),(('phrase_type',-1),),
-                     (('token',+0),), (('lemma',+0),), (('pos',+0),), (('entity',+0),), (('property',+0),),(('phrase_type',+0),),
-                     (('token',+1),), (('lemma',+1),), (('pos',+1),), (('entity',+1),), (('property',+1),),(('phrase_type',+1),),
-                     (('token',+2),), (('lemma',+2),), (('pos',+2),), (('entity',+2),), (('property',+2),),#(('phrase_type',+2),),
-        )
+    templates_holder = my_config_manager.get_templates_holder()
     possible_classes = ['holder']
-    template_filename = my_config_manager.get_holder_template_filename()
-    save_obj_to_file(templates,template_filename)
     for feat_file in glob.glob(feat_folder+'/*.feat'):
         base_name = os.path.basename(feat_file)
         base_name = base_name[:-5]
@@ -293,7 +278,7 @@ def train_holder_classifier():
         logging.debug('Creating crf file in --> '+out_crf)
     
         try:
-            extract_features_to_crf(feat_file,out_crf,fields,separator,templates,possible_classes)
+            extract_features_to_crf(feat_file,out_crf,fields,separator,templates_holder,possible_classes)
             crf_out_files.append(out_crf)
         except:
             print>>sys.stderr,'Failed conversion to tab-holder -> CRF: ',feat_file

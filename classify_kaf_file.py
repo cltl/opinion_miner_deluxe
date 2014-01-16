@@ -120,8 +120,7 @@ def run_crfsuite_tag(input_file,model_file):
 
 def detect_expressions(tab_feat_file,list_token_ids):
     #1) Convert to the correct CRF
-    template_filename = my_config_manager.get_expression_template_filename()
-    templates = load_obj_from_file(template_filename)
+    templates = my_config_manager.get_templates_expr() 
     
     crf_exp_file = convert_to_crf(tab_feat_file,templates)
     logging.debug('File with crf format for EXPRESSIONS '+crf_exp_file)
@@ -137,8 +136,7 @@ def detect_expressions(tab_feat_file,list_token_ids):
     
     
 def detect_targets(tab_feat_file, list_token_ids):
-    template_filename = my_config_manager.get_target_template_filename()
-    templates_target = load_obj_from_file(template_filename)    
+    templates_target =  my_config_manager.get_templates_target()
     
     crf_target_file = convert_to_crf(tab_feat_file,templates_target)
     logging.debug('File with crf format for TARGETS '+crf_target_file)
@@ -156,8 +154,7 @@ def detect_targets(tab_feat_file, list_token_ids):
            
            
 def detect_holders(tab_feat_file, list_token_ids):
-    template_filename = my_config_manager.get_holder_template_filename()
-    templates_holder = load_obj_from_file(template_filename)
+    templates_holder = my_config_manager.get_templates_holder()
     
     crf_holder_file = convert_to_crf(tab_feat_file,templates_holder)
     logging.debug('File with crf format for HOLDERS '+crf_holder_file)
