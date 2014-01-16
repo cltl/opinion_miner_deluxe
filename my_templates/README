@@ -1,0 +1,33 @@
+Format
+
+--> lines starting with # are skipped
+
+1 token -2 -1 0
+
+-> The first 1 is the length of the template, in this case unigram
+-> Then 'n' labels that will be used (must match with the labels generated
+ by the feature extractor)
+--> Then the positions, in case of 2grams 3grams each position must be
+--> n/m/p
+
+The example would generate these templates:
+('token',-2)
+('token',-1)
+('token',0)
+
+
+Example with bigrams
+2 token token -2/-1 -1/0 0/1 1/2
+
+would generate:
+(('token',-2),('token',-1))
+(('token',-1),('token',0))
+(('token',1),('token',1))
+
+
+Example with tigrams (the example makes no sense)
+3 token lemma pos -2/0/4 9/8/3
+(('token',-2),('lemma',0),('pos',4))
+(('token',9),('lemma',8),('pos',3))
+
+ 
