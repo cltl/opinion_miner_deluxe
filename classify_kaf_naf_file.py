@@ -107,6 +107,12 @@ def convert_to_crf(input_file,templates):
 def run_crfsuite_tag(input_file,model_file):
     crfsuite = my_config_manager.get_crfsuite_binary()
     cmd = [crfsuite]
+    if not os.path.exists(crfsuite):
+        print>>sys.stderr,'CRFsuite not found on',crfsuite
+        print>>sys.stderr,'Check the config filename and make sure the path is correctly set'
+        print>>sys.stderr,'[crfsuite]\npath_to_binary = yourpathtolocalcrfsuite'
+        sys.exit(-1)
+
     cmd.append('tag')
     cmd.append('-m '+model_file)
     cmd.append(input_file)

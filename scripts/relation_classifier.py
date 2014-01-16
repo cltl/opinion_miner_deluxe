@@ -152,6 +152,12 @@ def link_exp_hol(expressions,holders, knaf_obj):
 def run_svm_classify(example_file,model_file):
     #usage: svm_classify [options] example_file model_file output_file
     svmlight = config_manager.get_svm_classify_binary()
+    if not os.path.exists(svmlight):
+        print>>sys.stderr,'SVMlight learn not found on',svmlight
+        print>>sys.stderr,'Check the config filename and make sure the path is correctly set'
+        print>>sys.stderr,'[svmlight]\npath_to_binary_learn = yourpathtolocalsvmlightlearn'
+        sys.exit(-1)
+                                                      
     cmd = [svmlight]
     cmd.append(example_file)
     cmd.append(model_file)

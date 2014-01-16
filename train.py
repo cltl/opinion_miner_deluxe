@@ -305,6 +305,12 @@ def train_holder_classifier():
 def run_crfsuite(crf_params,input_file,model_file):
     
     crfsuite = my_config_manager.get_crfsuite_binary()
+    if not os.path.exists(crfsuite):
+        print>>sys.stderr,'CRFsuite not found on',crfsuite
+        print>>sys.stderr,'Check the config filename and make sure the path is correctly set'
+        print>>sys.stderr,'[crfsuite]\npath_to_binary = yourpathtolocalcrfsuite'
+        sys.exit(-1)
+        
     cmd = [crfsuite]
     cmd.append('learn')
     cmd.append(crf_params)
@@ -392,6 +398,13 @@ def train_classifier_relation_exp_hol():
     
 def run_svmlight_learn(example_file,model_file,params):
     svmlight = my_config_manager.get_svm_learn_binary()
+    
+    if not os.path.exists(svmlight):
+        print>>sys.stderr,'SVMlight learn not found on',svmlight
+        print>>sys.stderr,'Check the config filename and make sure the path is correctly set'
+        print>>sys.stderr,'[svmlight]\npath_to_binary_learn = yourpathtolocalsvmlightlearn'
+        sys.exit(-1)
+        
     cmd = [svmlight]
     cmd.append(params)
     cmd.append(example_file)
