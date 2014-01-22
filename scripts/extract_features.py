@@ -63,10 +63,13 @@ def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,log_file=None,incl
         term_id = term_obj.get_id()
         term_lemma = term_obj.get_lemma()
         term_pos = term_obj.get_morphofeat()
+        # if there is no morphofeat feature, we try to get the pos from the 'pos' attrib
+        if term_pos == None:
+            term_pos = term_obj.get_pos()
         if term_pos is not None:
             term_pos = term_pos.split(' ')[0] #[:2]  ## Only the 2 first chars of the pos string
         else:
-            term_pos = ''
+            term_pos = 'unknown'
         
           
         term_span = term_obj.get_span().get_span_ids()
@@ -211,6 +214,8 @@ def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,log_file=None,incl
         token,sentence_id,num_token = token_data[token_id]
         
         term_id = term_for_token.get(token_id,None)
+        
+        #This is required for wrong KAF files that contain missing terms (tokens not linked with terms)
         if term_id is not None:
             data = term_data.get(term_id,None)
             if data is not None:

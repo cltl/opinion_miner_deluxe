@@ -24,7 +24,7 @@ def map_tokens_to_terms(list_tokens,knaf_obj):
                     
     ret = set()
     for my_id in list_tokens:
-        term_ids = terms_for_token[my_id]
+        term_ids = terms_for_token.get(my_id,[])
         ret |= set(term_ids)
     return sorted(list(ret))
 

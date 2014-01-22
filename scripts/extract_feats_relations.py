@@ -6,7 +6,7 @@ def write_to_output(my_class,feats1, feats2, extra, output):
     my_str = my_class
     for name, value in feats1+feats2+extra:
         my_str += '\t'+name+'='+value
-    output.write(my_str+'\n')
+    output.write(my_str.encode('utf-8')+'\n')
     
     
     

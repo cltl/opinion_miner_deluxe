@@ -270,11 +270,24 @@ if __name__ == '__main__':
 
        
     expressions = detect_expressions(out_feat_file,list_token_ids)
-    #print>>sys.stderr,"Expressions:",expressions
     targets = detect_targets(out_feat_file, list_token_ids)
-    #print>>sys.stderr,'Target',targets
     holders = detect_holders(out_feat_file, list_token_ids)
-    #print>>sys.stderr,'Holders',holders
+
+    print>>sys.stderr,"Expressions detected:"
+    for e in expressions:
+        print>>sys.stderr,'\t',e
+    print>>sys.stderr
+    
+    print>>sys.stderr,'Targets detected'
+    for t in targets:
+        print>>sys.stderr,'\t',t
+    print>>sys.stderr
+        
+    print>>sys.stderr,'Holders',holders
+    for h in holders:
+        print>>sys.stderr,'\t',h
+    print>>sys.stderr
+    
     
     # Entity linker based on distances
     ####triples = link_entities_distance(expressions,targets,holders,sentence_for_token)
