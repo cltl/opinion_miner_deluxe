@@ -15,6 +15,8 @@ from scripts.relation_classifier import link_entities_svm
 from KafNafParserPy import *
 
 
+DEBUG=False
+
 
 my_config_manager = Cconfig_manager()
 __this_folder = os.path.dirname(os.path.realpath(__file__))
@@ -130,11 +132,15 @@ def detect_expressions(tab_feat_file,list_token_ids):
     
     crf_exp_file = convert_to_crf(tab_feat_file,templates)
     logging.debug('File with crf format for EXPRESSIONS '+crf_exp_file)
+    
     model_file = my_config_manager.get_filename_model_expression()
     output_crf,error_crf = run_crfsuite_tag(crf_exp_file,model_file)
+    
     logging.debug('Expressions crf error: '+error_crf)
     matches_exp = match_crfsuite_out(output_crf, list_token_ids)
+    
     logging.debug('Detector expressions out: '+str(matches_exp))
+    os.remove(crf_exp_file)
     return matches_exp
     
     
@@ -220,7 +226,7 @@ def add_opinions_to_knaf(triples,knaf_obj,map_to_terms=True):
         #Creating target
         span_tar = Cspan()
         span_tar.create_from_ids(span_tar_terms)
-        my_tar = Ctarget()
+        my_tar = opinion_data.Ctarget()
         my_tar.set_span(span_tar)
         #########################
 
@@ -273,20 +279,21 @@ if __name__ == '__main__':
     targets = detect_targets(out_feat_file, list_token_ids)
     holders = detect_holders(out_feat_file, list_token_ids)
 
-    print>>sys.stderr,"Expressions detected:"
-    for e in expressions:
-        print>>sys.stderr,'\t',e
-    print>>sys.stderr
+    if DEBUG:
+        print>>sys.stderr,"Expressions detected:"
+        for e in expressions:
+            print>>sys.stderr,'\t',e
+        print>>sys.stderr
     
-    print>>sys.stderr,'Targets detected'
-    for t in targets:
-        print>>sys.stderr,'\t',t
-    print>>sys.stderr
+        print>>sys.stderr,'Targets detected'
+        for t in targets:
+            print>>sys.stderr,'\t',t
+        print>>sys.stderr
         
-    print>>sys.stderr,'Holders',holders
-    for h in holders:
-        print>>sys.stderr,'\t',h
-    print>>sys.stderr
+        print>>sys.stderr,'Holders',holders
+        for h in holders:
+            print>>sys.stderr,'\t',h
+        print>>sys.stderr
     
     
     # Entity linker based on distances
@@ -304,6 +311,10 @@ if __name__ == '__main__':
     my_lp.set_timestamp()   ##Set to the current date and time
     knaf_obj.add_linguistic_processor('opinions',my_lp)
     knaf_obj.dump(sys.stdout)
+    
+    ##Remove temporals
+    os.remove(out_feat_file)
+    os.remove(err_feat_file)
     sys.exit(0)
     
     

@@ -88,7 +88,7 @@ def link_exp_tar(expressions,targets, knaf_obj):
         
         for best_tar_idx, best_value in selected:
             assigned_targets.append(targets[best_tar_idx])
-                
+        os.remove(examples_file.name)                
     return assigned_targets
 
 def link_exp_hol(expressions,holders, knaf_obj):
@@ -145,6 +145,7 @@ def link_exp_hol(expressions,holders, knaf_obj):
         for best_hol_idx, best_value in selected:
             assigned_holders.append(holders[best_hol_idx])
                 
+        os.remove(examples_file.name)
     return assigned_holders
 
 
