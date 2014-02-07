@@ -204,7 +204,7 @@ def map_tokens_to_terms(list_tokens,knaf_obj):
         
         
               
-def add_opinions_to_knaf(triples,knaf_obj,map_to_terms=True):
+def add_opinions_to_knaf(triples,knaf_obj,text_for_tid,map_to_terms=True):
     num_opinion =  0
     for type_exp, span_exp, span_tar, span_hol in triples:
         #Map tokens to terms       
@@ -223,11 +223,16 @@ def add_opinions_to_knaf(triples,knaf_obj,map_to_terms=True):
         my_hol = Cholder()
         my_hol.set_span(span_hol)
         
+        hol_text = ' '.join(text_for_tid[tid] for tid in span_hol_terms)
+        my_hol.set_comment(hol_text)
+        
         #Creating target
         span_tar = Cspan()
         span_tar.create_from_ids(span_tar_terms)
         my_tar = opinion_data.Ctarget()
         my_tar.set_span(span_tar)
+        tar_text = ' '.join(text_for_tid[tid] for tid in span_tar_terms)
+        my_tar.set_comment(tar_text)
         #########################
 
         ##Creating expression
@@ -237,6 +242,8 @@ def add_opinions_to_knaf(triples,knaf_obj,map_to_terms=True):
         my_exp.set_span(span_exp)
         my_exp.set_polarity(type_exp)
         my_exp.set_strength("1")
+        exp_text = ' '.join(text_for_tid[tid] for tid in span_exp_terms)
+        my_exp.set_comment(exp_text)
         #########################
         
         new_opinion = Copinion(type=knaf_obj.get_type())
@@ -265,14 +272,22 @@ if __name__ == '__main__':
     
     #get all the tokens in order
     list_token_ids = []
+    text_for_wid = {}
+    text_for_tid = {}
     sentence_for_token = {}
     for token_obj in knaf_obj.get_tokens():
         token = token_obj.get_text()
         s_id = token_obj.get_sent()
         w_id = token_obj.get_id()
+        text_for_wid[w_id] = token
          
         list_token_ids.append(w_id)
         sentence_for_token[w_id] = s_id
+        
+    for term in knaf_obj.get_terms():
+        tid = term.get_id()
+        toks = [text_for_wid[wid] for wid in term.get_span().get_span_ids()]
+        text_for_tid[tid] = ' '.join(toks)
 
        
     expressions = detect_expressions(out_feat_file,list_token_ids)
@@ -302,7 +317,7 @@ if __name__ == '__main__':
     triples = link_entities_svm(expressions, targets, holders, knaf_obj, my_config_manager)
     knaf_obj.remove_opinion_layer()
     
-    add_opinions_to_knaf(triples, knaf_obj,map_to_terms=False)   
+    add_opinions_to_knaf(triples, knaf_obj,text_for_tid,map_to_terms=False)   
     
     #Adding linguistic processor
     my_lp = Clp()
