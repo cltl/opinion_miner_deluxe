@@ -26,7 +26,8 @@ This section explains how to add new features to the system
 
 1) Modify the function that generates the features is scripts/extract_features.py-> extract_features_from_kaf_naf_file(...)
 
-1.1) Modify the variable features, is a list of features for each token
+1.1) Modify the variable `features`, is a list of features for each token
+
 1.2) Modify the variable labels, which gives a name to each feature (lenghts must match)
 
 2) Modify the function that generates from the templates the features for CRF (considering context)
