@@ -3,7 +3,10 @@
 ##Introduction##
 
 Opinion miner based on machine learning that can be trained using a list of
-KAF/NAF files
+KAF/NAF files. It is important to notice that the opinion miner module will not call
+to any external module to obtain features. It will read all the features from the input KAF/NAF file,
+so you have to make sure that your input file contains all the required information in advance (tokens,
+terms, polarities, constituents, entitiess, dependencies...)
 
 The task is divided into 2 steps
 * Detection of opinion entities (holder, target and expression): using
@@ -22,7 +25,7 @@ The first step when extracting opinions from text is to determine which portions
 - Opinion holders: I, our family, the manager ...
 
 In order to do this, three different Conditional Random Fields (CRF) classifiers have been trained using by default this set of features: tokens,
-lemmas, part-of-speech tags, constituent labels and polarity of words. These classifiers detect portions of text representeing differnet opinion
+lemmas, part-of-speech tags, constituent labels and polarity of words and entities. These classifiers detect portions of text representeing differnet opinion
 entities.
 
 
