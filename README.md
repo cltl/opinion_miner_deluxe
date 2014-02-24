@@ -185,8 +185,31 @@ An one more example with trigrams: `3 token lemma pos -2/0/4 9/8/3`.
 
 ###Adding new features to the opinion entity linking (SVM)###
 
-To be done...
+You will need to modify the script `scripts/extract_feats_relations.py`. There is one function to extract the features from an opinion
+expression and a target, for the SVM model expression - target, and another function with the same purpose for the SVM model expression-holder.
+These functions are:
 
+````shell
+def extract_feats_exp_tar(exp_ids,tar_ids,knaf_obj):
+    ...
+    
+def extract_feats_exp_hol(exp_ids,hol_ids,knaf_obj):
+    ...
+````
+
+Both take as input a list of term identifiers for the expression and for the target/holder, and a kaf/naf tree object representing the input file,
+so there is no need to parse it again. These functions return a list of features for the expression, a list of features for the holder/target and two
+extra list of features (for the expression and for the target/holder), that will be used later to stablish features that represent a relation (like
+the dependencies or whether both are in the same sentence or not.) In order to to this, there are two functions that take as input two set of features
+and generate this relation features:
+
+````shell
+def get_extra_feats_exp_tar(extra_e, extra_t):
+    ...
+
+def get_extra_feats_exp_hol(extra_e, extra_h):
+    ...
+````
 
 ##Contact##
 * Ruben Izquierdo
