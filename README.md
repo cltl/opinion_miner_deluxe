@@ -211,6 +211,11 @@ def get_extra_feats_exp_hol(extra_e, extra_h):
     ...
 ````
 
+The main reason of this is that the features for each expression, target and holder is extracted only once, but later for instance each target will act
+as a positive example in one case (with its correct expression), but as negative example for the rest of possible expressions in the file. So the relation
+features can not be extracted in advance for a pair expression/target but has to be computed for each pair we consider, and in order to do this we need
+the two get_extra_feats functions indicated above.
+
 ##Contact##
 * Ruben Izquierdo
 * Vrije University of Amsterdam
