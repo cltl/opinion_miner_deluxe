@@ -159,6 +159,7 @@ def detect_targets(tab_feat_file, list_token_ids):
 
     matches_tar = match_crfsuite_out(out_crf_target, list_token_ids)
     logging.debug('Detector targets out: '+str(matches_tar))
+    os.remove(crf_target_file)
     return matches_tar
            
            
@@ -177,6 +178,7 @@ def detect_holders(tab_feat_file, list_token_ids):
 
     matches_holder = match_crfsuite_out(out_crf_holder, list_token_ids)
     logging.debug('Detector HOLDERS out: '+str(matches_holder))
+    os.remove(crf_holder_file)
     return matches_holder
               
               
@@ -204,7 +206,7 @@ def map_tokens_to_terms(list_tokens,knaf_obj):
         
         
               
-def add_opinions_to_knaf(triples,knaf_obj,text_for_tid,map_to_terms=True):
+def add_opinions_to_knaf(triples,knaf_obj,text_for_tid,map_to_terms=True,include_polarity_strength=True):
     num_opinion =  0
     for type_exp, span_exp, span_tar, span_hol in triples:
         #Map tokens to terms       
@@ -241,7 +243,8 @@ def add_opinions_to_knaf(triples,knaf_obj,text_for_tid,map_to_terms=True):
         my_exp = Cexpression()
         my_exp.set_span(span_exp)
         my_exp.set_polarity(type_exp)
-        my_exp.set_strength("1")
+        if include_polarity_strength:
+            my_exp.set_strength("1")
         exp_text = ' '.join(text_for_tid[tid] for tid in span_exp_terms)
         my_exp.set_comment(exp_text)
         #########################
@@ -259,14 +262,16 @@ def add_opinions_to_knaf(triples,knaf_obj,text_for_tid,map_to_terms=True):
         
         knaf_obj.add_opinion(new_opinion)
         
-        
-if __name__ == '__main__':
-    config_file = sys.argv[1]
+##
+# Input_file_stream can be a filename of a stream
+# Opoutfile_trasm can be a filename of a stream
+#Config file must be a string filename
+def tag_file_with_opinions(input_file_stream, output_file_stream,config_file,remove_existing_opinions=True,include_polarity_strength=True):
     my_config_manager.set_current_folder(__this_folder)
     my_config_manager.set_config(config_file)
     
     
-    knaf_obj = KafNafParser(sys.stdin)
+    knaf_obj = KafNafParser(input_file_stream)
     #Create a temporary file
     out_feat_file, err_feat_file = extract_features(knaf_obj)
     
@@ -293,6 +298,9 @@ if __name__ == '__main__':
     expressions = detect_expressions(out_feat_file,list_token_ids)
     targets = detect_targets(out_feat_file, list_token_ids)
     holders = detect_holders(out_feat_file, list_token_ids)
+    
+    os.remove(out_feat_file)
+    os.remove(err_feat_file)
 
     if DEBUG:
         print>>sys.stderr,"Expressions detected:"
@@ -315,9 +323,11 @@ if __name__ == '__main__':
     ####triples = link_entities_distance(expressions,targets,holders,sentence_for_token)
     
     triples = link_entities_svm(expressions, targets, holders, knaf_obj, my_config_manager)
-    knaf_obj.remove_opinion_layer()
     
-    add_opinions_to_knaf(triples, knaf_obj,text_for_tid,map_to_terms=False)   
+    if remove_existing_opinions:
+        knaf_obj.remove_opinion_layer()
+    
+    add_opinions_to_knaf(triples, knaf_obj,text_for_tid,map_to_terms=False,include_polarity_strength=include_polarity_strength)   
     
     #Adding linguistic processor
     my_lp = Clp()
@@ -325,11 +335,14 @@ if __name__ == '__main__':
     my_lp.set_version(__last_edited+'_'+__version)
     my_lp.set_timestamp()   ##Set to the current date and time
     knaf_obj.add_linguistic_processor('opinions',my_lp)
-    knaf_obj.dump(sys.stdout)
+    knaf_obj.dump(output_file_stream)
     
-    ##Remove temporals
-    os.remove(out_feat_file)
-    os.remove(err_feat_file)
+  
+        
+if __name__ == '__main__':
+    config_file = sys.argv[1]
+    
+    tag_file_with_opinions(sys.stdin, sys.stdout,config_file)
     sys.exit(0)
     
     

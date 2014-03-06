@@ -23,7 +23,6 @@ from KafNafParserPy import KafNafParser
 #Globa configuration
 my_config_manager = Cconfig_manager()
 
-logging.basicConfig(stream=sys.stderr,format='%(asctime)s - %(levelname)s\n %(message)s', level=logging.DEBUG)
 __this_folder = os.path.dirname(os.path.realpath(__file__))
 
 
@@ -425,10 +424,10 @@ def write_to_flag(msg,openas='a'):
     my_time = time.strftime('%Y-%m-%dT%H:%M:%S%Z')
     flag.write(msg+' --> '+my_time+'\n')
     flag.close() 
-
-if __name__ == '__main__':
-    file_config = sys.argv[1]
     
+def train_all(file_config):
+  
+
     # Read configuration from the config file
     my_config_manager.set_current_folder(__this_folder)
     my_config_manager.set_config(file_config)
@@ -473,8 +472,9 @@ if __name__ == '__main__':
     write_to_flag('FINISHED ')
     
     
-    
-
-    
-    
+if __name__ == '__main__':
+    logging.basicConfig(stream=sys.stderr,format='%(asctime)s - %(levelname)s\n %(message)s', level=logging.DEBUG)
+    file_config = sys.argv[1]
+    train_all(file_config)
+           
     sys.exit(0)

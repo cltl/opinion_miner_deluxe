@@ -7,26 +7,6 @@ from VUA_pylib.io import Cfeature_index
 import os
 
 config_manager = None
-terms_for_token = None
-
-def map_tokens_to_terms(list_tokens,knaf_obj):
-    global terms_for_token
-    if terms_for_token is None:
-        terms_for_token = {}
-        for term in knaf_obj.get_terms():
-            termid = term.get_id()
-            token_ids = term.get_span().get_span_ids()
-            for tokid in token_ids:
-                if tokid not in terms_for_token:
-                    terms_for_token[tokid] = [termid]
-                else:
-                    terms_for_token[tokid].append(termid)
-                    
-    ret = set()
-    for my_id in list_tokens:
-        term_ids = terms_for_token.get(my_id,[])
-        ret |= set(term_ids)
-    return sorted(list(ret))
 
     
 def link_exp_tar(expressions,targets, knaf_obj):
@@ -193,15 +173,15 @@ def link_entities_svm(expressions, targets, holders, knaf_obj,this_config_manage
     
     for exp_ids,exp_type in expressions:
         all_types.append(exp_type)
-        exp_term_ids = map_tokens_to_terms(exp_ids, knaf_obj)
+        exp_term_ids = knaf_obj.map_tokens_to_terms(exp_ids)
         all_exp_ids.append(exp_term_ids)
     
     for tar_ids, tar_type in targets:
-        tar_term_ids = map_tokens_to_terms(tar_ids, knaf_obj)
+        tar_term_ids = knaf_obj.map_tokens_to_terms(tar_ids)
         all_tar_ids.append(tar_term_ids)
 
     for hol_ids, hol_type in holders:
-        hol_term_ids = map_tokens_to_terms(hol_ids, knaf_obj)
+        hol_term_ids = knaf_obj.map_tokens_to_terms(hol_ids)
         all_hol_ids.append(hol_term_ids)
     
     assigned_targets = link_exp_tar(all_exp_ids, all_tar_ids,knaf_obj)
@@ -211,6 +191,8 @@ def link_entities_svm(expressions, targets, holders, knaf_obj,this_config_manage
     results = []
     for index, exp_type in enumerate(all_types):
         results.append((exp_type,all_exp_ids[index], assigned_targets[index],  assigned_holders[index]))
+    del config_manager
+    config_manager = None
     return results
 
  

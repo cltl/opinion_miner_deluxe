@@ -16,7 +16,13 @@ def feature_extractor(X,templates):
 def extract_features_to_crf(inputfile,outputfile,fields,separator,templates,possible_classes=None):
   fi = open(inputfile,'r')
   fo = open(outputfile,'w')
-  main(feature_extractor,templates=templates,fields=fields,sep=separator,fi=fi,fo=fo,possible_classes=possible_classes)
+  #this_main(feature_extractor,templates=templates,fields=fields,sep=separator,fi=fi,fo=fo,possible_classes=possible_classes)
+  
+  F = fields.split(' ')
+  for X in readiter(fi, F, separator):
+      feature_extractor(X,templates)
+      output_features(fo, X, 'y',possible_classes)
+
   fi.close()
   fo.close()
 
@@ -154,7 +160,8 @@ def to_crfsuite(X):
         xseq.append(item)
     return xseq
 
-def main(feature_extractor, templates,fields='w pos y', sep=' ',fi = sys.stdin,fo = sys.stdout,possible_classes=None):
+'''
+def this_main(feature_extractor, templates,fields='w pos y', sep=' ',fi = sys.stdin,fo = sys.stdout,possible_classes=None):
 
     # Parse the command-line arguments.
     parser = optparse.OptionParser(usage="""usage: %prog [options]
@@ -205,3 +212,4 @@ attributes, this utility tags the input data when a model file is specified by
                 fo.write('\t'.join([v[f] for f in F]))
                 fo.write('\t%s\n' % yseq[t])
             fo.write('\n')
+'''

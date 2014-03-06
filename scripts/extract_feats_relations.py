@@ -98,6 +98,7 @@ def extract_feats_exp_tar(exp_ids,tar_ids,knaf_obj):
     
     ## EXTRA FEATURES
     ## This will be used to establish a relation between expression and target, it is not a feature for one single entity
+
     avg_position_tar = avg_position_tar * 1.0 / n_toks  
     
     extra_feats_exp = {}
