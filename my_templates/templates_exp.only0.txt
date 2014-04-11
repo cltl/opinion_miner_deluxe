@@ -1,0 +1,6 @@
+1 token 0 -1 1
+1 lemma 0 -1 1
+1 pos 0 -1 1
+1 pol/mod 0 -1 1
+1 phrase_type 0 -1 1
+1 poldomain 0 -1 1

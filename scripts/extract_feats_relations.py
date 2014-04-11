@@ -2,9 +2,9 @@
 
 import sys
 
-def write_to_output(my_class,feats1, feats2, extra, output):
+def write_to_output(my_class,feats, output):
     my_str = my_class
-    for name, value in feats1+feats2+extra:
+    for name, value in feats:
         my_str += '\t'+name+'='+value
     output.write(my_str.encode('utf-8')+'\n')
     
@@ -15,9 +15,9 @@ def write_to_output(my_class,feats1, feats2, extra, output):
 #########################################################################  
 # This function extracts features for the relation between expression adn target
 # for the svm classifier
-def extract_feats_exp_tar(exp_ids,tar_ids,knaf_obj):
-    feats_for_exp = []
-    feats_for_tar = []
+def extract_feats_exp_tar(exp_ids,tar_ids,knaf_obj, use_lemmas=True, use_tokens=True, use_dependencies=True):
+    all_feats = []
+    use_lemmas = use_tokens = False
     
     data_for_token = {}     # [token_id] -> (word, sentence_id)
     for num_token, token_obj in enumerate(knaf_obj.get_tokens()):
@@ -43,15 +43,16 @@ def extract_feats_exp_tar(exp_ids,tar_ids,knaf_obj):
     n_toks = 0
     for my_id in exp_ids:
         lemma, span_tok_ids = data_for_term[my_id]
-        feats_for_exp.append(('lemmaExp',lemma))
+        if use_lemmas:
+            all_feats.append(('lemmaExp',lemma))
                 
                 
         for tok_id in span_tok_ids:
             token,sent_id,num_token = data_for_token[tok_id]
             avg_position_exp += num_token
             n_toks += 1
-            
-            feats_for_exp.append(('tokenExp',token))
+            if use_tokens:
+                all_feats.append(('tokenExp',token))
             
             if sentence_for_exp is None:
                 sentence_for_exp = sent_id
@@ -64,95 +65,59 @@ def extract_feats_exp_tar(exp_ids,tar_ids,knaf_obj):
     n_toks = 0
     for my_id in tar_ids:
         lemma, span_tok_ids = data_for_term[my_id]
-        feats_for_tar.append(('lemmaTar',lemma))
+        if use_lemmas:
+            all_feats.append(('lemmaTar',lemma))
                 
         for tok_id in span_tok_ids:
             token,sent_id,num_token = data_for_token[tok_id]
             avg_position_tar += num_token
             n_toks += 1
-            feats_for_tar.append(('tokenTar',token))
+            if use_tokens:
+                all_feats.append(('tokenTar',token))
 
             if sentence_for_tar is None:
                 sentence_for_tar = sent_id
     
-    ## Dependency relations
-    dependency_extractor = knaf_obj.get_dependency_extractor()
-    if dependency_extractor is not None:
-        #For expression
-        deps_from_exp_to_root = dependency_extractor.get_shortest_path_to_root_span(exp_ids)
-        if deps_from_exp_to_root is not None:
-            if len(deps_from_exp_to_root) == 0:  #one term is the root of the sentence
-                deps_from_exp_to_root = ['IS_ROOT']
-        
-            feats_for_exp.append(('first-dependency-exp',deps_from_exp_to_root[0]))
-            feats_for_exp.append(('chain-dependency-exp','#'.join(deps_from_exp_to_root)))
-    
-        ##For target
-        deps_from_tar_to_root = dependency_extractor.get_shortest_path_to_root_span(tar_ids)
-        if deps_from_tar_to_root is not None:
-            if len(deps_from_tar_to_root) == 0:
-                deps_from_tar_to_root = ['IS_ROOT']
-            
-            feats_for_tar.append(('first-dependency-tar',deps_from_tar_to_root[0]))
-            feats_for_tar.append(('chain-dependency-tar','#'.join(deps_from_tar_to_root))) 
-    
-    ## EXTRA FEATURES
-    ## This will be used to establish a relation between expression and target, it is not a feature for one single entity
-
     avg_position_tar = avg_position_tar * 1.0 / n_toks  
     
-    extra_feats_exp = {}
-    extra_feats_exp['sent'] = sentence_for_exp
-    extra_feats_exp['avg_position'] = avg_position_exp
-    extra_feats_exp['total_tokens'] = len(data_for_token)
-        
-    extra_feats_tar = {}
-    extra_feats_tar['sent'] = sentence_for_tar
-    extra_feats_tar['avg_position'] = avg_position_tar
-            
-            
-    return feats_for_exp,feats_for_tar, extra_feats_exp, extra_feats_tar
+    if use_dependencies:
+        dependency_extractor = knaf_obj.get_dependency_extractor()
+        if dependency_extractor is not None:
+            deps = dependency_extractor.get_shortest_path_spans(exp_ids,tar_ids)
+            if deps is not None:
+                all_feats.append(('deps-exp-tar','#'.join(deps)))
     
-def get_extra_feats_exp_tar(extra_e, extra_t):
-    ## Obtaining if both are in the same sentence or not
-    feats = []
-    sent_e = extra_e.get('sent')
-    sent_t = extra_t.get('sent')
-    if sent_e is not None and sent_t is not None and sent_e == sent_t :
-        feats.append(('same_sentence','yes'))
+  
+    if sentence_for_exp is not None and sentence_for_tar is not None and sentence_for_exp == sentence_for_tar:
+        all_feats.append(('same_sentence','yes'))
     else:
-        feats.append(('same_sentence','no'))
-    ############################################
-    
-    
-    ## Obtaining the "normalized" distance from expression to target    
-    avg_e = extra_e.get('avg_position')
-    avg_t = extra_t.get('avg_position')
-    total_tokens = extra_e.get('total_tokens')
-    dist = abs(avg_e - avg_t)
-    my_dist = None
-    if dist <= total_tokens *10.0 / 100:
+        all_feats.append(('same_sentence','no'))
+        
+    ##Distance
+    dist = abs(avg_position_exp - avg_position_tar)
+    if dist <= 10:
         my_dist = 'veryclose'
-    elif dist <= total_tokens * 20.0 / 100:
-        my_dist = 'close'
-    elif dist <= total_tokens * 50.0 / 100:
-        my_dist = 'medium'
-    elif dist <= total_tokens * 75.0 / 100:
+    elif dist <=20:
+        my_dist  = 'close'
+    elif dist <=25:
         my_dist = 'far'
     else:
-        my_dist = 'superfar'
-    feats.append(('distExpTar',my_dist))
-    return feats
+        my_dist = 'veryfar'
+    all_feats.append(('distExpTar',my_dist))
+    #all_feats.append(('absDist',str(dist))) 
+  
+    return all_feats
+
+    
       
   
         
     
-def create_rel_exp_tar_training(knaf_obj, output=sys.stdout, valid_opinions=None):
-    
-   
+def create_rel_exp_tar_training(knaf_obj, output=sys.stdout, valid_opinions=None,use_dependencies=True):
     # Obtain pairs of features for Expression and Target
     pairs = [] # [(Exp,Tar), (E,T), (E,T)....]
     for opinion in knaf_obj.get_opinions():
+        opi_id = opinion.get_id()
         opi_exp = opinion.get_expression()
         exp_type = ''
         exp_ids = []
@@ -176,61 +141,26 @@ def create_rel_exp_tar_training(knaf_obj, output=sys.stdout, valid_opinions=None
         
         
         if len(tar_ids) != 0 and len(exp_ids) != 0:
-            feats_for_exp, feats_for_tar, extra_feats_exp, extra_feats_tar = extract_feats_exp_tar(exp_ids,tar_ids,knaf_obj)              
-            pairs.append((feats_for_exp,feats_for_tar, extra_feats_exp, extra_feats_tar))
+            pairs.append((exp_ids,tar_ids))
+
             
-    #for feat_exp, feat_tar
-    for idx1, (e1, t1,extra_e1, extra_t1) in enumerate(pairs):
-        
-        ## Same sentence
-        extra_feats1 = get_extra_feats_exp_tar(extra_e1, extra_t1)
-        
-        write_to_output('+1', e1, t1,extra_feats1, output)
-        for idx2, (e2, t2, extra_e2, extra_t2) in enumerate(pairs):
+    for idx1, (exp1, tar1) in enumerate(pairs):
+        feats_positive = extract_feats_exp_tar(exp1,tar1,knaf_obj,use_dependencies)
+        write_to_output('+1', feats_positive, output)
+        for idx2, (exp2, tar2) in enumerate(pairs):
             if idx1 != idx2:
-                extra_feats2 = get_extra_feats_exp_tar(extra_e1, extra_t2)
-                write_to_output('-1', e1, t2,extra_feats2, output)              
+                feats_negative = extract_feats_exp_tar(exp1,tar2,knaf_obj,use_dependencies)
+                write_to_output('-1', feats_negative, output)
+                      
     
 
 
-#########################################################################   
-# EXTRACTION OF FEATURES FOR TRAINING THE RELATION CLASSIFIER EXP --> HOL
-#########################################################################   
-def get_extra_feats_exp_hol(extra_e, extra_h):
-    ## Obtaining if both are in the same sentence or not
-    feats = []
-    sent_e = extra_e.get('sent')
-    sent_h = extra_h.get('sent')
-    if sent_e is not None and sent_h is not None and sent_e == sent_h :
-        feats.append(('same_sentence','yes'))
-    else:
-        feats.append(('same_sentence','no'))
-    ############################################
-    
-    
-    ## Obtaining the "normalized" distance from expression to target    
-    avg_e = extra_e.get('avg_position')
-    avg_h = extra_h.get('avg_position')
-    total_tokens = extra_e.get('total_tokens')
-    dist = abs(avg_e - avg_h)
-    my_dist = None
-    if dist <= total_tokens *10.0 / 100:
-        my_dist = 'veryclose'
-    elif dist <= total_tokens * 20.0 / 100:
-        my_dist = 'close'
-    elif dist <= total_tokens * 50.0 / 100:
-        my_dist = 'medium'
-    elif dist <= total_tokens * 75.0 / 100:
-        my_dist = 'far'
-    else:
-        my_dist = 'superfar'
-    feats.append(('distExpHol',my_dist))
-    return feats  
 
-def extract_feats_exp_hol(exp_ids,hol_ids,knaf_obj):
-    feats_for_exp = []
-    feats_for_hol = []
 
+def extract_feats_exp_hol(exp_ids,hol_ids,knaf_obj, use_lemmas=True, use_tokens=True, use_dependencies=True):
+    all_feats = []
+    use_lemmas = use_tokens = False
+    
     data_for_token = {}     # [token_id] -> (word, sentence_id)
     for num_token, token_obj in enumerate(knaf_obj.get_tokens()):
         word = token_obj.get_text()
@@ -255,76 +185,75 @@ def extract_feats_exp_hol(exp_ids,hol_ids,knaf_obj):
     n_toks = 0
     for my_id in exp_ids:
         lemma, span_tok_ids = data_for_term[my_id]
-        feats_for_exp.append(('lemmaExp',lemma))
+        if use_lemmas:
+            all_feats.append(('lemmaExp',lemma))
+                
                 
         for tok_id in span_tok_ids:
-            
             token,sent_id,num_token = data_for_token[tok_id]
             avg_position_exp += num_token
             n_toks += 1
-            feats_for_exp.append(('tokenExp',token))
+            if use_tokens:
+                all_feats.append(('tokenExp',token))
+            
             if sentence_for_exp is None:
-                sentence_for_exp= sent_id
-    avg_position_exp = avg_position_exp * 1.0 / n_toks 
+                sentence_for_exp = sent_id
+                
+    avg_position_exp = avg_position_exp * 1.0 / n_toks  
 
-    #Lemmas for holder    
+    #Lemmas for HOLDER    
     sentence_for_hol = None
     avg_position_hol = 0
     n_toks = 0
     for my_id in hol_ids:
         lemma, span_tok_ids = data_for_term[my_id]
-        feats_for_hol.append(('lemmaHol',lemma))
+        if use_lemmas:
+            all_feats.append(('lemmaHol',lemma))
                 
         for tok_id in span_tok_ids:
             token,sent_id,num_token = data_for_token[tok_id]
             avg_position_hol += num_token
             n_toks += 1
-            feats_for_hol.append(('tokenHol',token))
+            if use_tokens:
+                all_feats.append(('tokenHol',token))
+
             if sentence_for_hol is None:
                 sentence_for_hol = sent_id
                 
-                
-    ## Dependency relations
-    dependency_extractor = knaf_obj.get_dependency_extractor()
-    #For expression
-    if dependency_extractor is not None:
-        deps_from_exp_to_root = dependency_extractor.get_shortest_path_to_root_span(exp_ids)
-        if deps_from_exp_to_root is not None:
-            if len(deps_from_exp_to_root) == 0:  #one term is the root of the sentence
-                deps_from_exp_to_root = ['IS_ROOT']
-        
-            feats_for_exp.append(('first-dependency-exp',deps_from_exp_to_root[0]))
-            feats_for_exp.append(('chain-dependency-exp','#'.join(deps_from_exp_to_root)))
+    avg_position_hol = avg_position_hol * 1.0 / n_toks
     
-        ##For HOLDER
-        #print>>sys.stderr,'HOL_IDS', hol_ids
-        deps_from_hol_to_root = dependency_extractor.get_shortest_path_to_root_span(hol_ids)
-        if deps_from_hol_to_root is not None:
-            if len(deps_from_hol_to_root) == 0:
-                deps_from_hol_to_root = ['IS_ROOT']
-            
-            feats_for_hol.append(('first-dependency-hol',deps_from_hol_to_root[0]))
-            feats_for_hol.append(('chain-dependency-hol','#'.join(deps_from_hol_to_root))) 
-    #################        
-            
-             
-    avg_position_hol = avg_position_hol * 1.0 / n_toks 
+    if use_dependencies:
+        dependency_extractor = knaf_obj.get_dependency_extractor()
+        if dependency_extractor is not None:
+            deps = dependency_extractor.get_shortest_path_spans(exp_ids,hol_ids)
+            if deps is not None:
+                all_feats.append(('deps-exp-hol','#'.join(deps)))
     
-    extra_feats_exp = {}
-    extra_feats_exp['sent'] = sentence_for_exp
-    extra_feats_exp['avg_position'] = avg_position_exp
-    extra_feats_exp['total_tokens'] = len(data_for_token)
+  
+    if sentence_for_exp is not None and sentence_for_hol is not None and sentence_for_exp == sentence_for_hol:
+        all_feats.append(('same_sentence','yes'))
+    else:
+        all_feats.append(('same_sentence','no'))
         
-    extra_feats_hol = {}
-    extra_feats_hol['sent'] = sentence_for_hol
-    extra_feats_hol['avg_position'] = avg_position_hol
-    return feats_for_exp,feats_for_hol, extra_feats_exp, extra_feats_hol    
+    ##Distance
+    dist = abs(avg_position_exp - avg_position_hol)
+    if dist <= 10:
+        my_dist = 'veryclose'
+    elif dist <=20:
+        my_dist  = 'close'
+    elif dist <=25:
+        my_dist = 'far'
+    else:
+        my_dist = 'veryfar'
+    all_feats.append(('distExpHol',my_dist))
+    #all_feats.append(('absDist',str(dist))) 
+  
+    return all_feats
+  
                 
     
-def create_rel_exp_hol_training(knaf_obj, output=sys.stdout, valid_opinions=None):
-    
-   
-    
+def create_rel_exp_hol_training(knaf_obj, output=sys.stdout, valid_opinions=None,use_dependencies=True):
+       
     # Obtain pairs of features for Expression and Holder
     pairs = [] # [(Exp,Hol), (E,H), (E,H)....]
     for opinion in knaf_obj.get_opinions():
@@ -351,17 +280,18 @@ def create_rel_exp_hol_training(knaf_obj, output=sys.stdout, valid_opinions=None
         
         
         if len(exp_ids) != 0 and len(hol_ids) != 0:
-            feats_for_exp, feats_for_hol, extra_feats_exp, extra_feats_hol  = extract_feats_exp_hol(exp_ids,hol_ids,knaf_obj)              
-            pairs.append((feats_for_exp,feats_for_hol, extra_feats_exp, extra_feats_hol))
+            pairs.append((exp_ids,hol_ids))
+            
             
     #for feat_exp, feat_tar
-    for idx1, (e1, h1, extra_e1, extra_h1) in enumerate(pairs):
-        extra_feats1 = get_extra_feats_exp_hol(extra_e1, extra_h1)
-        write_to_output('+1', e1, h1,extra_feats1,output)
-        for idx2, (e2, h2, extra_e2, extra_h2) in enumerate(pairs):
+    for idx1, (expids1, tarids1) in enumerate(pairs):
+        
+        feats_positive = extract_feats_exp_hol(expids1,tarids1,knaf_obj, use_dependencies=use_dependencies)
+        write_to_output('+1', feats_positive,output)
+        
+        for idx2, (expids2, tarids2) in enumerate(pairs):
             if idx1 != idx2:
-                extra_feats2 = get_extra_feats_exp_hol(extra_e1, extra_h2)
-                write_to_output('-1', e1, h2,extra_feats2,output)
-    #return dependency_extractor
+                feats_negative = extract_feats_exp_hol(expids1,tarids2,knaf_obj, use_dependencies=use_dependencies)
+                write_to_output('-1', feats_negative ,output)
     
     

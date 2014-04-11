@@ -2,6 +2,9 @@ import os
 import ConfigParser
 import shutil
 
+internal_config_filename= 'config.cfg'
+
+
 def load_templates_from_file(filename):
     templates = []
     fic = open(filename,'r')
@@ -46,7 +49,21 @@ class Cconfig_manager:
         else:
             self.out_folder = os.path.join(self.this_folder,output_folder_cfg)
 
+    def get_use_dependencies(self):
+        use_dependencies = True ##Default
+        if self.config.has_section('features'):
+            if self.config.has_option('features', 'use_dependencies'):
+                use_dependencies = self.config.getboolean('features', 'use_dependencies')
+        return use_dependencies
         
+        
+    def get_use_training_lexicons(self):
+        use_lexicons = True ##Default
+        if self.config.has_section('features'):
+            if self.config.has_option('features', 'use_training_lexicons'):
+                use_lexicons = self.config.getboolean('features', 'use_training_lexicons')
+        return use_lexicons   
+     
     def set_out_folder(self,o):
         self.out_folder = o
         
@@ -124,7 +141,21 @@ class Cconfig_manager:
             self.templates_target = load_templates_from_file(filename_template)
         return self.templates_target    
     
+    def get_lexicons_folder(self):
+        my_name = 'lexicons'
+        return os.path.join(self.get_output_folder(),my_name)
+    
     ###############
+    def get_expression_lexicon_filename(self):
+        #eturn '/home/izquierdo/opener_repos/sentiment-lexicons/lexicons_from_annotations/hotel/nl/expressions.csv'
+        my_name = 'polarity_lexicon.csv'
+        return os.path.join(self.get_lexicons_folder(),my_name)
+
+    def get_target_lexicon_filename(self):
+        #return '/home/izquierdo/opener_repos/sentiment-lexicons/lexicons_from_annotations/hotel/nl/targets.csv'
+        my_name = 'target_lexicon.csv'
+        return os.path.join(self.get_lexicons_folder(),my_name)    
+    
     def get_feature_folder_name(self):
         subfolder_feats = 'tab_feature_files'  
         out_folder = self.get_output_folder()
@@ -239,5 +270,5 @@ class Cconfig_manager:
     def get_filename_model_exp_hol(self):
         my_name = 'model_relation_exp_hol.svmlight'
         return os.path.join(self.get_folder_relation_classifier(),my_name)
-      
+
       

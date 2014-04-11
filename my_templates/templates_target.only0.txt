@@ -1,0 +1,11 @@
+# sentence_id token_id token lemma pos term_id pol/mod mpqa_subjectivity
+# mpqa_polarity 
+# entity property phrase_type y
+
+1 token 0 -1 1
+1 lemma 0 -1 1
+1 pos 0 -1 1
+1 entity 0 -1 1
+1 property 0 -1 1
+1 phrase_type 0 -1 1
+1 aspect_training 0 -1 1

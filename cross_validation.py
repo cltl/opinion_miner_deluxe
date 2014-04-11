@@ -5,6 +5,7 @@ import sys
 import ConfigParser
 import os
 import shutil
+import time
 
 from subprocess import Popen, PIPE
 from generate_folds import generate_folds
@@ -12,7 +13,12 @@ from train import train_all
 from classify_kaf_naf_file import tag_file_with_opinions
 from KafNafParserPy import KafNafParser
 
+
+## CHANGES
+# 1stApril2014 --> Included evaluation for the opinion miner basic
+
 default_jar_file='/home/izquierdo/code/triple_evaluation/lib/TripleEvaluation-1.0-jar-with-dependencies.jar'
+path_to_basic = '/home/izquierdo/opener_repos/opinion-detector-basic/core/opinion_detector_basic_multi.py'
 
 '''
 java -Xmx812m -cp $eval_jar_file \
@@ -128,8 +134,20 @@ def extract_figures(evaluation_file):
             rec_rel = fields[-2]
             prec_rel = fields[-1]
     fic.close()
-    return float(prec_first),float(rec_first),float(prec_second),float(rec_second),float(prec_rel),float(rec_rel)
+    return float(prec_first)*100,float(rec_first)*100,float(prec_second)*100,float(rec_second)*100,float(prec_rel),float(rec_rel)
 
+
+#This functions calls to the 
+def run_basic_version(input_file,output_file):
+  cmd = path_to_basic
+  fin = open(input_file,'r')
+  fout = open(output_file,'w')
+  basic_opinion_miner = Popen(cmd,stdin=fin, stdout=fout,stderr=PIPE,shell=True)
+  fin.close()
+  basic_opinion_miner.wait()
+  fout.close()
+
+    
         
 if __name__ == '__main__':
     #map_opinion_labels('input.kaf','output.kaf','models/hotel_set1_set2_nl_validation/fold_0/config.cfg')
@@ -168,11 +186,31 @@ if __name__ == '__main__':
     output_folder = my_config.get('general','output_folder')
 
     
-    ## Creating the folds in this way:
+    # Creating the folds in this way:
     # output_folder/fold_[0-9]+    
-    #generate_folds(corpus_filename,arguments.num_folds,output_folder)
+    
+    #With this we generate new folds and so on
+    generate_folds(corpus_filename,arguments.num_folds,output_folder)
+    
+    
+    ## With this we copy it from a referencre created split of folds
+    '''
+    reference = '/home/izquierdo/cltl_repos/opinion_miner_deluxe/models/hotel_nl_trainandtest_all'
+    if os.path.exists(output_folder):
+        shutil.rmtree(output_folder)
+    shutil.copytree(reference, output_folder)
+    '''
     
     ## Process each fold
+    
+    #For the deluxe
+    all_files = 0
+    all_p_e = all_r_e = all_p_t = all_r_t = all_p_h = all_r_h = all_p_e_t = all_r_e_t = all_p_e_h = all_r_e_h = 0
+    
+    #For the basic
+    all_files_basic = 0
+    all_p_e_basic = all_r_e_basic = all_p_t_basic = all_r_t_basic = all_p_h_basic = all_r_h_basic = 0
+    all_p_e_t_basic = all_r_e_t_basic = all_p_e_h_basic = all_r_e_h_basic = 0    
     for num in range(arguments.num_folds):
         this_folder = output_folder+'/fold_'+str(num)
         this_model_folder = this_folder+'/models'
@@ -191,10 +229,20 @@ if __name__ == '__main__':
         # We need to run now the training for this folder
         #def train_all(file_config):
         print 'Training'
-        print '  Folder',this_folder
+        print '  Folder',this_folder,
 
-        #train_all(this_config)
-        
+        this_pid = os.fork()
+        if this_pid == 0:
+            train_all(this_config)
+            sys.exit(0)
+        else:
+            while True:
+                sys.stdout.write('.')
+                sys.stdout.flush()
+                status = os.waitpid(this_pid,os.WNOHANG)
+                if status[0] != 0:   break
+                time.sleep(1)
+            
         #####
         ## Do the evaluation
         ####
@@ -205,6 +253,11 @@ if __name__ == '__main__':
             shutil.rmtree(folder_out_kafs)
         os.mkdir(folder_out_kafs)
         
+        folder_out_kafs_basic = this_folder+'/output_files_basic'
+        if os.path.exists(folder_out_kafs_basic):
+            shutil.rmtree(folder_out_kafs_basic)
+        os.mkdir(folder_out_kafs_basic)
+        
         folder_gold_triples = this_folder+'/gold_triples'
         if os.path.exists(folder_gold_triples): shutil.rmtree(folder_gold_triples)
         os.mkdir(folder_gold_triples)
@@ -213,8 +266,14 @@ if __name__ == '__main__':
         fold_test_corpora_desc = open(fold_test_corpora,'r')
         
         evaluation_folder = this_folder+'/evaluation'
-        if os.path.exists(evaluation_folder): shutil.rmtree(evaluation_folder)
+        if os.path.exists(evaluation_folder): 
+            shutil.rmtree(evaluation_folder)
         os.mkdir(evaluation_folder)
+
+        evaluation_folder_basic = this_folder+'/evaluation_basic'
+        if os.path.exists(evaluation_folder_basic): 
+            shutil.rmtree(evaluation_folder_basic)
+        os.mkdir(evaluation_folder_basic)
 
         list_triple_files = []  #Pairs (gold,out)
         list_test_base_files = []
@@ -232,26 +291,53 @@ if __name__ == '__main__':
             
             input_test_file  = folder_gold_triples+'/'+basename_file 
             gold_triple_file = folder_gold_triples+'/'+basename_file+'.trp'
-            output_test_file = folder_out_kafs+'/'+basename_file
-            output_triple_file = folder_out_kafs+'/'+basename_file+'.trp'
-            list_triple_files.append((gold_triple_file,output_triple_file))
             
-            tag_file_with_opinions(input_test_file,output_test_file,this_config,remove_existing_opinions=True,include_polarity_strength=False)
-            print '  Classified in ',os.path.basename(output_test_file)
             
             convert_to_triple(arguments.eval_jar_file, input_test_file)
             print '  Created triple gold in',os.path.basename(gold_triple_file)
             
+            ##########################
+            #For the deluxe version  #
+            ##########################
+            output_test_file = folder_out_kafs+'/'+basename_file
+            output_triple_file = folder_out_kafs+'/'+basename_file+'.trp'
+            
+            
+            tag_file_with_opinions(input_test_file,output_test_file,this_model_folder,remove_existing_opinions=True,include_polarity_strength=False)
+            print '  Classified DELUXE in ',os.path.basename(output_test_file)
+                        
             convert_to_triple(arguments.eval_jar_file,output_test_file)
-            print '  Created triple system in',os.path.basename(output_triple_file)    
+            print '  Created triple deluxe system in',os.path.basename(output_triple_file)    
             
             # Run the evaluation     
             evaluate_triples(arguments.eval_jar_file, gold_triple_file, output_triple_file, evaluation_folder)
-            print '  Evaluated on',evaluation_folder
+            print '  Evaluated deluxe on',evaluation_folder
+            #########################
+            
+            ##########################
+            #For the basic version   #
+            ##########################   
+            output_test_file_basic = folder_out_kafs_basic+'/'+basename_file
+            output_triple_file_basic = folder_out_kafs_basic+'/'+basename_file+'.trp' 
+            
+            #Call to the opinion miner basic and generate output_test_file_basic
+            run_basic_version(input_test_file,output_test_file_basic)
+            print '  Classified BASIC in ',os.path.basename(output_test_file_basic)
+        
+            convert_to_triple(arguments.eval_jar_file,output_test_file_basic)
+            print '  Created triple basic system in',os.path.basename(output_triple_file_basic)
+            
+            # Run the evaluation     
+            evaluate_triples(arguments.eval_jar_file, gold_triple_file, output_triple_file_basic, evaluation_folder_basic)
+            print '  Evaluated basic on',evaluation_folder_basic
+            #########################  
+            
+                    
 
         fold_test_corpora_desc.close()
         
-        ## Extract 
+        ## Extract the figures from the excel files
+        #DELUXE
         num_files = 0
         over_p_e = over_r_e = over_p_t = over_r_t = over_p_h = over_r_h = over_p_e_t = over_r_e_t = over_p_e_h = over_r_e_h = 0
         for test_file in list_test_base_files:
@@ -274,28 +360,36 @@ if __name__ == '__main__':
             over_p_e_h += prec_rel_exp_hol
             over_r_e_h += rec_rel_exp_hol
             num_files += 1
+          
+ 
+        #BASIC
+        num_files_basic = 0
+        over_p_e_basic = over_r_e_basic = over_p_t_basic = over_r_t_basic = over_p_h_basic = 0
+        over_r_h_basic = over_p_e_t_basic = over_r_e_t_basic = over_p_e_h_basic = over_r_e_h_basic = 0
+        for test_file in list_test_base_files:
+            expression_eval_file = evaluation_folder_basic+'/'+test_file+'.expression'
+            target_eval_file = evaluation_folder_basic+'/'+test_file+'.target'
+            holder_eval_file = evaluation_folder_basic+'/'+test_file+'.holder'
             
-            print test_file
-            print '  Expression:'
-            print '    Precision:',prec_exp
-            print '    Recall:   ',rec_exp
-            print '  Target:'
-            print '    Precision:',prec_tar
-            print '    Recall:   ',rec_tar
-            print '  Holder:'
-            print '    Precision:',prec_hol
-            print '    Recall:   ',rec_hol
-            print '  Relation:'
-            print '    Exp-Tar'
-            print '      Prec:',prec_rel_exp_tar
-            print '      Rec: ',rec_rel_exp_tar
-            print '    Exp-Hol'
-            print '      Prec:',prec_rel_exp_hol
-            print '      Rec: ',rec_rel_exp_hol
-            print
+            prec_exp, rec_exp, _, _, _, _ = extract_figures(expression_eval_file)
+            _,_, prec_tar,rec_tar, prec_rel_exp_tar, rec_rel_exp_tar = extract_figures(target_eval_file)
+            _,_, prec_hol, rec_hol, prec_rel_exp_hol, rec_rel_exp_hol = extract_figures(holder_eval_file)
+            
+            over_p_e_basic += prec_exp
+            over_r_e_basic += rec_exp
+            over_p_t_basic += prec_tar
+            over_r_t_basic += rec_tar
+            over_p_h_basic += prec_hol 
+            over_r_h_basic += rec_hol
+            over_p_e_t_basic += prec_rel_exp_tar
+            over_r_e_t_basic += rec_rel_exp_tar
+            over_p_e_h_basic += prec_rel_exp_hol
+            over_r_e_h_basic += rec_rel_exp_hol
+            num_files_basic += 1       
+         
         print
         print '#'*30
-        print 'OVERALL RESULTS'
+        print 'OVERALL DELUXE RESULTS FOR FOLD NUM',num
         print 'Num files:',num_files
         print '  Expression:'
         print '    Precision:',over_p_e*1.0/num_files
@@ -314,14 +408,145 @@ if __name__ == '__main__':
         print '      Prec:',over_p_e_h*1.0/num_files
         print '      Rec: ',over_r_e_h*1.0/num_files
         print '#'*30
-        print       
-
+        print 
+        all_files +=  num_files
+        all_p_e +=over_p_e
+        all_r_e += over_r_e
+        all_p_t += over_p_t
+        all_r_t += over_r_t
+        all_p_h += over_p_h
+        all_r_h += over_r_h
+        all_p_e_t += over_p_e_t
+        all_r_e_t += over_r_e_t
+        all_p_e_h += over_p_e_h
+        all_r_e_h += over_r_e_h
         
-        
-        
-        
-        
+        print
+        print '#'*30
+        print 'OVERALL BASIC RESULTS FOR FOLD NUM',num
+        print 'Num files:',num_files_basic
+        print '  Expression:'
+        print '    Precision:',over_p_e_basic*1.0/num_files_basic
+        print '    Recall:   ',over_r_e_basic*1.0/num_files_basic
+        print '  Target:'
+        print '    Precision:',over_p_t_basic*1.0/num_files_basic
+        print '    Recall:   ',over_r_t_basic*1.0/num_files_basic
+        print '  Holder:'
+        print '    Precision:',over_p_h_basic*1.0/num_files_basic
+        print '    Recall:   ',over_r_h_basic*1.0/num_files_basic
+        print '  Relation:'
+        print '    Exp-Tar'
+        print '      Prec:',over_p_e_t_basic*1.0/num_files_basic
+        print '      Rec: ',over_r_e_t_basic*1.0/num_files_basic
+        print '    Exp-Hol'
+        print '      Prec:',over_p_e_h_basic*1.0/num_files_basic
+        print '      Rec: ',over_r_e_h_basic*1.0/num_files_basic
+        print '#'*30
+        print 
+        all_files_basic +=  num_files_basic
+        all_p_e_basic +=over_p_e_basic
+        all_r_e_basic += over_r_e_basic
+        all_p_t_basic += over_p_t_basic
+        all_r_t_basic += over_r_t_basic
+        all_p_h_basic += over_p_h_basic
+        all_r_h_basic += over_r_h_basic
+        all_p_e_t_basic += over_p_e_t_basic
+        all_r_e_t_basic += over_r_e_t_basic
+        all_p_e_h_basic += over_p_e_h_basic
+        all_r_e_h_basic += over_r_e_h_basic
         break
+        #if num==3:
+        #    break
+    
+        
+    ## NEXT FOLD!!!   
+    print
+    print '#'*30
+    print 'FINAL DELUXE OVERALL RESULTS FOR ALL FOLDS (microaverage)'
+    print 'Total Num files:',all_files
+    print 'Total num folds:',num
+    print '  Expression:'
+    print '    Precision:',all_p_e*1.0/all_files
+    print '    Recall:   ',all_r_e*1.0/all_files
+    print '  Target:'
+    print '    Precision:',all_p_t*1.0/all_files
+    print '    Recall:   ',all_r_t*1.0/all_files
+    print '  Holder:'
+    print '    Precision:',all_p_h*1.0/all_files
+    print '    Recall:   ',all_r_h*1.0/all_files
+    print '  Relation:'
+    print '    Exp-Tar'
+    print '      Prec:',all_p_e_t*1.0/all_files
+    print '      Rec: ',all_r_e_t*1.0/all_files
+    print '    Exp-Hol'
+    print '      Prec:',all_p_e_h*1.0/all_files
+    print '      Rec: ',all_r_e_h*1.0/all_files
+    print '#'*30
+    print    
+    
+    print 'LATEX DELUXE'
+    print '\\begin{table}'
+    print '\\begin{tabular}{c|c|c|}'
+    print '\\hline'
+    print 'Type & Precision & Recall\\\\'
+    print '\\hline'
+    print 'Expression & %.2f & %.2f\\\\' % (all_p_e*1.0/all_files,all_r_e*1.0/all_files)
+    print 'Target & %.2f & %.2f \\\\' % (all_p_t*1.0/all_files,all_r_t*1.0/all_files)
+    print 'Holder & %.2f & %.2f \\\\' % (all_p_h*1.0/all_files,all_r_h*1.0/all_files)
+    print '\\hline'
+    print 'Exp-Tar & %.2f & %.2f\\\\' % (all_p_e_t*1.0/all_files,all_r_e_t*1.0/all_files)
+    print 'Exp-Hol & %.2f & %.2f\\\\' % (all_p_e_h*1.0/all_files,all_r_e_h*1.0/all_files)
+    print '\\hline'
+    print '\\end{tabular}'
+    print '\\caption{Caption here}'
+    print '\\end{table}'
+
+
+    print
+    print '#'*30
+    print 'FINAL OVERALL BASIC RESULTS FOR ALL FOLDS (microaverage)'
+    print 'Total Num files:',all_files_basic
+    print 'Total num folds:',num
+    print '  Expression:'
+    print '    Precision:',all_p_e_basic*1.0/all_files_basic
+    print '    Recall:   ',all_r_e_basic*1.0/all_files_basic
+    print '  Target:'
+    print '    Precision:',all_p_t_basic*1.0/all_files_basic
+    print '    Recall:   ',all_r_t_basic*1.0/all_files_basic
+    print '  Holder:'
+    print '    Precision:',all_p_h_basic*1.0/all_files_basic
+    print '    Recall:   ',all_r_h_basic*1.0/all_files_basic
+    print '  Relation:'
+    print '    Exp-Tar'
+    print '      Prec:',all_p_e_t_basic*1.0/all_files_basic
+    print '      Rec: ',all_r_e_t_basic*1.0/all_files_basic
+    print '    Exp-Hol'
+    print '      Prec:',all_p_e_h_basic*1.0/all_files_basic
+    print '      Rec: ',all_r_e_h_basic*1.0/all_files_basic
+    print '#'*30
+    print    
+    
+    print 'LATEX BASIC'
+    print '\\begin{table}'
+    print '\\begin{tabular}{c|c|c|}'
+    print '\\hline'
+    print 'Type & Precision & Recall\\\\'
+    print '\\hline'
+    print 'Expression & %.2f & %.2f\\\\' % (all_p_e_basic*1.0/all_files_basic,all_r_e_basic*1.0/all_files_basic)
+    print 'Target & %.2f & %.2f \\\\' % (all_p_t_basic*1.0/all_files_basic,all_r_t_basic*1.0/all_files_basic)
+    print 'Holder & %.2f & %.2f \\\\' % (all_p_h_basic*1.0/all_files_basic,all_r_h_basic*1.0/all_files_basic)
+    print '\\hline'
+    print 'Exp-Tar & %.2f & %.2f\\\\' % (all_p_e_t_basic*1.0/all_files_basic,all_r_e_t_basic*1.0/all_files_basic)
+    print 'Exp-Hol & %.2f & %.2f\\\\' % (all_p_e_h_basic*1.0/all_files_basic,all_r_e_h_basic*1.0/all_files_basic)
+    print '\\hline'
+    print '\\end{tabular}'
+    print '\\caption{Caption here}'
+    print '\\end{table}'
+     
+        
+        
+        
+        
     
     # Proceed with the evaluation
     

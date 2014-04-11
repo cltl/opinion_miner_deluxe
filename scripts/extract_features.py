@@ -2,9 +2,10 @@
 
 import sys
 import codecs
+import csv
 from operator import itemgetter
 
-from VUA_pylib.lexicon import MPQA_subjectivity_lexicon
+#from VUA_pylib.lexicon import MPQA_subjectivity_lexicon
 
 
 def get_first_term_id(token_data,term_data,this_ids):
@@ -16,9 +17,55 @@ def get_first_term_id(token_data,term_data,this_ids):
     vector_tid_pos.sort(key=itemgetter(1))
     return vector_tid_pos[0][0]
 
-def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,log_file=None,include_class=True,accepted_opinions=None):
-    labels = ['sentence_id','token_id','token','lemma','pos','term_id','pol/mod','mpqa_subjectivity','mpqa_polarity','entity','property','phrase_type','y']
 
+def get_mapping_from_lexicon(token_ids,lexicon):
+    #Create index offset --> ids
+    idx = 0
+    my_map = {}
+    text = ' '
+    for token, tid in token_ids:
+        for c in token:
+            my_map[idx] = tid
+            idx+=1
+        text += token+' '
+        idx+=1
+    ####
+    all_extracted = [] # List of [(ids,polarity), (ids, polarity)
+    
+    
+    for substring, polarity in lexicon.items():
+        current_found = 0
+        while True:
+            start = text.find(' '+substring+' ',current_found)
+            if start == -1: 
+                break
+            end = start + len(substring)
+            current_found = end
+            ids = set(my_map[myidx] for myidx in range(start,end) if myidx in my_map)
+            if len(ids) != 0:
+                all_extracted.append((ids,polarity))
+            
+    final_selected = {}
+    
+    #If w15 has been selected first, for instance (w14,w15,w16) will not be selected later in this file
+    for ids,polarity in sorted(all_extracted, key=lambda t: len(t[0])):
+        already_selected = False
+        for this_id in ids:
+            if this_id in final_selected:
+                already_selected = True
+        
+        if not already_selected:
+            for this_id in ids:
+                final_selected[this_id] = polarity
+    return final_selected 
+
+    
+
+def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,log_file=None,include_class=True,accepted_opinions=None, exp_lex= None, tar_lex=None):
+    
+    labels = []
+    
+    polarities_found_and_skipped = []
     separator = '\t'
     restore_out = None
     log_on = False
@@ -42,10 +89,12 @@ def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,log_file=None,incl
     token_data = {} ## token_data['w_1'] = ('house','s_1')
     tokens_in_order = []
     num_token = 0 
+    tokens_ids = []
     for token_obj in knaf_obj.get_tokens(): 
         token = token_obj.get_text()
         s_id = token_obj.get_sent()
         w_id = token_obj.get_id()
+        tokens_ids.append((token,w_id))
         token_data[w_id] = (token,s_id,num_token)
         tokens_in_order.append(w_id)
         num_token += 1
@@ -53,6 +102,15 @@ def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,log_file=None,incl
         print>>log_desc,'  Number of tokens: ',len(tokens_in_order)
     ###########################
 
+    #Lexicons from the training data
+    mapping_wid_polarity = {}
+    if exp_lex is not None:
+        mapping_wid_polarity = get_mapping_from_lexicon(tokens_ids,exp_lex)
+        
+    mapping_wid_aspect = {}
+    if tar_lex is not None:
+        mapping_wid_aspect = get_mapping_from_lexicon(tokens_ids, tar_lex)
+        
     
     ###########################
     ## EXTRACTING TERMS #######
@@ -159,7 +217,8 @@ def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,log_file=None,incl
                     mapped_type = accepted_opinions[exp_type]
                 else:
                     # This opinion wont be considered
-                    continue
+                    polarities_found_and_skipped.append(exp_type)
+                    continue    
             else:
                 mapped_type = exp_type
             
@@ -205,8 +264,11 @@ def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,log_file=None,incl
         ##############
             
             
-    my_mpqa_subj_lex = MPQA_subjectivity_lexicon()
+    #my_mpqa_subj_lex = MPQA_subjectivity_lexicon()
     ## WRITE TO THE OUTPUT
+    
+    
+   
     
    
     prev_sent = None
@@ -224,13 +286,14 @@ def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,log_file=None,incl
                 property = property_for_term.get(term_id,'-')
                 this_class = class_for_term_id.get(term_id,'O')
                 
+                '''
                 #Mpqa subjectivy from the mpqa corpus
                 mpqa_type = mpqa_pol = '-'
                 if my_mpqa_subj_lex is not None:
                     mpqa_data = my_mpqa_subj_lex.get_type_and_polarity(token,term_pos)
                     if mpqa_data is not None:
                         mpqa_type, mpqa_pol = mpqa_data
-                                  
+                '''               
                                 
                                 
                 ## Constituency features
@@ -242,12 +305,21 @@ def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,log_file=None,incl
                         feature_phrase = this_phrase
                 ######################
                                   
+                ### Expression from the domain lexicon
+                polarity_from_domain = mapping_wid_polarity.get(token_id,'-')
+                
+                ## Target from the training lexicon
+                aspect_from_domain = mapping_wid_aspect.get(token_id,'-')
+                
                 ##############################################################################################
                 ## FEATURE GENERATION!!!!
                 ##############################################################################################
+                labels =   ['sentence_id','token_id','token','lemma',    'pos',    'term_id', 'pol/mod', 'poldomain',         'aspect_training']
+                features = [ sentence_id,  token_id,  token,  term_lemma, term_pos, term_id,   polarity  ,polarity_from_domain,aspect_from_domain]
                 
-                features = [sentence_id,token_id,token,term_lemma,term_pos,term_id, polarity]
-                features.extend([mpqa_type, mpqa_pol, entity,property,feature_phrase,this_class])
+                
+                labels.extend(['entity','property','phrase_type','y'])
+                features.extend([entity,property,feature_phrase,this_class])
                 
                 ##############################################################################################
                 ##############################################################################################
@@ -269,5 +341,5 @@ def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,log_file=None,incl
         sys.stdout.close()
         sys.stdout = restore_out
         
-    return labels, separator
+    return labels, separator, polarities_found_and_skipped
 
