@@ -101,7 +101,11 @@ def map_opinion_labels(input_file,output_file,config_file):
     for opinion in input_kaf.get_opinions():
         exp = opinion.get_expression()
         polarity = exp.get_polarity()
-        mapped_polarity = mapping[polarity]
+        if polarity in mapping:
+            mapped_polarity = mapping[polarity]
+        else:
+            mapped_polarity = polarity
+            
         exp.set_polarity(mapped_polarity)
     input_kaf.dump(output_file)
     
@@ -139,10 +143,11 @@ def extract_figures(evaluation_file):
 
 #This functions calls to the 
 def run_basic_version(input_file,output_file):
-  cmd = path_to_basic
+  cmd = [path_to_basic]
+  cmd.append('--no-opinion-strength')
   fin = open(input_file,'r')
   fout = open(output_file,'w')
-  basic_opinion_miner = Popen(cmd,stdin=fin, stdout=fout,stderr=PIPE,shell=True)
+  basic_opinion_miner = Popen(' '.join(cmd),stdin=fin, stdout=fout,stderr=PIPE,shell=True)
   fin.close()
   basic_opinion_miner.wait()
   fout.close()
@@ -161,8 +166,10 @@ if __name__ == '__main__':
     argument_parser.add_argument('-n', type=int, default=10, dest='num_folds',help="Num folds (default 10)")
     argument_parser.add_argument('--config_file','-f',dest='config_file', required=True, help='Configuration file')
     argument_parser.add_argument('--eval_jar_file', action='store',dest='eval_jar_file', default=default_jar_file,help='Path to triple evaluation jar file (Default '+default_jar_file+')')
-    
+    argument_parser.add_argument('-id',dest='exp_id',default='unknown',help='Experiment ID')
+    argument_parser.add_argument('-out_folds', dest='out_folds', type=argparse.FileType('wb'),)
     arguments = argument_parser.parse_args()
+    
     
     ##
     corpus_filename = None
@@ -201,6 +208,16 @@ if __name__ == '__main__':
     shutil.copytree(reference, output_folder)
     '''
     
+    
+    if arguments.out_folds is not None:
+        arguments.out_folds.write('\\begin{table}\n')
+        arguments.out_folds.write("\\begin{tabular}{c|c|c|c|c|c|c||c|c|c|c}\n")
+        arguments.out_folds.write("\\hline\n")
+        arguments.out_folds.write("Type & \\multicolumn{2}{|c|}{Expression} & \\multicolumn{2}{|c|}{Target} & \\multicolumn{2}{|c||}{Holder} &")
+        arguments.out_folds.write("\\multicolumn{2}{|c|}{Expression-Target} & \\multicolumn{2}{|c|}{Expression-Holder}\n")
+        arguments.out_folds.write("\\hline\n")
+        arguments.out_folds.write("& P & R &  P & R &  P & R &  P & R &  P & R \\\\\n")
+        arguments.out_folds.flush()
     ## Process each fold
     
     #For the deluxe
@@ -228,8 +245,8 @@ if __name__ == '__main__':
         
         # We need to run now the training for this folder
         #def train_all(file_config):
-        print 'Training'
-        print '  Folder',this_folder,
+        print>>sys.stderr, 'Training'
+        print>>sys.stderr, '  Folder',this_folder,
 
         this_pid = os.fork()
         if this_pid == 0:
@@ -237,8 +254,8 @@ if __name__ == '__main__':
             sys.exit(0)
         else:
             while True:
-                sys.stdout.write('.')
-                sys.stdout.flush()
+                sys.stderr.write('.')
+                sys.stderr.flush()
                 status = os.waitpid(this_pid,os.WNOHANG)
                 if status[0] != 0:   break
                 time.sleep(1)
@@ -287,14 +304,14 @@ if __name__ == '__main__':
             # and the output of the system just positive and neative (internal mapping)
             
             map_opinion_labels(input_test_file,folder_gold_triples+'/'+basename_file,this_config)
-            print 'Processing ',basename_file
+            print>>sys.stderr, 'Processing ',basename_file
             
             input_test_file  = folder_gold_triples+'/'+basename_file 
             gold_triple_file = folder_gold_triples+'/'+basename_file+'.trp'
             
             
             convert_to_triple(arguments.eval_jar_file, input_test_file)
-            print '  Created triple gold in',os.path.basename(gold_triple_file)
+            print>>sys.stderr, '  Created triple gold in',os.path.basename(gold_triple_file)
             
             ##########################
             #For the deluxe version  #
@@ -304,14 +321,14 @@ if __name__ == '__main__':
             
             
             tag_file_with_opinions(input_test_file,output_test_file,this_model_folder,remove_existing_opinions=True,include_polarity_strength=False)
-            print '  Classified DELUXE in ',os.path.basename(output_test_file)
+            print>>sys.stderr, '  Classified DELUXE in ',os.path.basename(output_test_file)
                         
             convert_to_triple(arguments.eval_jar_file,output_test_file)
-            print '  Created triple deluxe system in',os.path.basename(output_triple_file)    
+            print>>sys.stderr, '  Created triple deluxe system in',os.path.basename(output_triple_file)    
             
             # Run the evaluation     
             evaluate_triples(arguments.eval_jar_file, gold_triple_file, output_triple_file, evaluation_folder)
-            print '  Evaluated deluxe on',evaluation_folder
+            print>>sys.stderr, '  Evaluated deluxe on',evaluation_folder
             #########################
             
             ##########################
@@ -322,14 +339,14 @@ if __name__ == '__main__':
             
             #Call to the opinion miner basic and generate output_test_file_basic
             run_basic_version(input_test_file,output_test_file_basic)
-            print '  Classified BASIC in ',os.path.basename(output_test_file_basic)
+            print>>sys.stderr, '  Classified BASIC in ',os.path.basename(output_test_file_basic)
         
             convert_to_triple(arguments.eval_jar_file,output_test_file_basic)
-            print '  Created triple basic system in',os.path.basename(output_triple_file_basic)
+            print>>sys.stderr, '  Created triple basic system in',os.path.basename(output_triple_file_basic)
             
             # Run the evaluation     
             evaluate_triples(arguments.eval_jar_file, gold_triple_file, output_triple_file_basic, evaluation_folder_basic)
-            print '  Evaluated basic on',evaluation_folder_basic
+            print>>sys.stderr, '  Evaluated basic on',evaluation_folder_basic
             #########################  
             
                     
@@ -387,28 +404,55 @@ if __name__ == '__main__':
             over_r_e_h_basic += rec_rel_exp_hol
             num_files_basic += 1       
          
-        print
-        print '#'*30
-        print 'OVERALL DELUXE RESULTS FOR FOLD NUM',num
-        print 'Num files:',num_files
-        print '  Expression:'
-        print '    Precision:',over_p_e*1.0/num_files
-        print '    Recall:   ',over_r_e*1.0/num_files
-        print '  Target:'
-        print '    Precision:',over_p_t*1.0/num_files
-        print '    Recall:   ',over_r_t*1.0/num_files
-        print '  Holder:'
-        print '    Precision:',over_p_h*1.0/num_files
-        print '    Recall:   ',over_r_h*1.0/num_files
-        print '  Relation:'
-        print '    Exp-Tar'
-        print '      Prec:',over_p_e_t*1.0/num_files
-        print '      Rec: ',over_r_e_t*1.0/num_files
-        print '    Exp-Hol'
-        print '      Prec:',over_p_e_h*1.0/num_files
-        print '      Rec: ',over_r_e_h*1.0/num_files
-        print '#'*30
-        print 
+        if arguments.out_folds is not None:
+            arguments.out_folds.write("%s & %.2f & %.2f & %.2f & %.2f & %.2f & %.2f & %.2f & %.2f & %.2f & %.2f\\\\\n" % ("Deluxe Fold "+str(num),
+                                                                                                                        over_p_e*1.0/num_files,
+                                                                                                                        over_r_e*1.0/num_files,
+                                                                                                                        over_p_t*1.0/num_files,
+                                                                                                                        over_r_t*1.0/num_files,
+                                                                                                                        over_p_h*1.0/num_files,
+                                                                                                                        over_r_h*1.0/num_files,
+                                                                                                                        over_p_e_t*1.0/num_files,
+                                                                                                                        over_r_e_t*1.0/num_files,
+                                                                                                                        over_p_e_h*1.0/num_files,
+                                                                                                                        over_r_e_h*1.0/num_files))
+            arguments.out_folds.write("%s & %.2f & %.2f & %.2f & %.2f & %.2f & %.2f & %.2f & %.2f & %.2f & %.2f\\\\\n" % ("Basic Fold "+str(num),
+                                                                                                                        over_p_e_basic*1.0/num_files_basic,
+                                                                                                                        over_r_e_basic*1.0/num_files_basic,
+                                                                                                                        over_p_t_basic*1.0/num_files_basic,
+                                                                                                                        over_r_t_basic*1.0/num_files_basic,
+                                                                                                                        over_p_h_basic*1.0/num_files_basic,
+                                                                                                                        over_r_h_basic*1.0/num_files_basic,
+                                                                                                                        over_p_e_t_basic*1.0/num_files_basic,
+                                                                                                                        over_r_e_t_basic*1.0/num_files_basic,
+                                                                                                                        over_p_e_h_basic*1.0/num_files_basic,
+                                                                                                                        over_r_e_h_basic*1.0/num_files_basic
+                                                                                                                        ))
+            arguments.out_folds.flush()                                      
+                                                                                                                               
+            
+                    
+        print>>sys.stderr
+        print>>sys.stderr, '#'*30
+        print>>sys.stderr, 'OVERALL DELUXE RESULTS FOR FOLD NUM',num
+        print>>sys.stderr, 'Num files:',num_files
+        print>>sys.stderr, '  Expression:'
+        print>>sys.stderr, '    Precision:',over_p_e*1.0/num_files
+        print>>sys.stderr, '    Recall:   ',over_r_e*1.0/num_files
+        print>>sys.stderr, '  Target:'
+        print>>sys.stderr, '    Precision:',over_p_t*1.0/num_files
+        print>>sys.stderr, '    Recall:   ',over_r_t*1.0/num_files
+        print>>sys.stderr, '  Holder:'
+        print>>sys.stderr, '    Precision:',over_p_h*1.0/num_files
+        print>>sys.stderr, '    Recall:   ',over_r_h*1.0/num_files
+        print>>sys.stderr, '  Relation:'
+        print>>sys.stderr, '    Exp-Tar'
+        print>>sys.stderr, '      Prec:',over_p_e_t*1.0/num_files
+        print>>sys.stderr, '      Rec: ',over_r_e_t*1.0/num_files
+        print>>sys.stderr, '    Exp-Hol'
+        print>>sys.stderr, '      Prec:',over_p_e_h*1.0/num_files
+        print>>sys.stderr, '      Rec: ',over_r_e_h*1.0/num_files
+        print>>sys.stderr, '#'*30
         all_files +=  num_files
         all_p_e +=over_p_e
         all_r_e += over_r_e
@@ -421,28 +465,28 @@ if __name__ == '__main__':
         all_p_e_h += over_p_e_h
         all_r_e_h += over_r_e_h
         
-        print
-        print '#'*30
-        print 'OVERALL BASIC RESULTS FOR FOLD NUM',num
-        print 'Num files:',num_files_basic
-        print '  Expression:'
-        print '    Precision:',over_p_e_basic*1.0/num_files_basic
-        print '    Recall:   ',over_r_e_basic*1.0/num_files_basic
-        print '  Target:'
-        print '    Precision:',over_p_t_basic*1.0/num_files_basic
-        print '    Recall:   ',over_r_t_basic*1.0/num_files_basic
-        print '  Holder:'
-        print '    Precision:',over_p_h_basic*1.0/num_files_basic
-        print '    Recall:   ',over_r_h_basic*1.0/num_files_basic
-        print '  Relation:'
-        print '    Exp-Tar'
-        print '      Prec:',over_p_e_t_basic*1.0/num_files_basic
-        print '      Rec: ',over_r_e_t_basic*1.0/num_files_basic
-        print '    Exp-Hol'
-        print '      Prec:',over_p_e_h_basic*1.0/num_files_basic
-        print '      Rec: ',over_r_e_h_basic*1.0/num_files_basic
-        print '#'*30
-        print 
+        print>>sys.stderr
+        print>>sys.stderr, '#'*30
+        print>>sys.stderr, 'OVERALL BASIC RESULTS FOR FOLD NUM',num
+        print>>sys.stderr, 'Num files:',num_files_basic
+        print>>sys.stderr, '  Expression:'
+        print>>sys.stderr, '    Precision:',over_p_e_basic*1.0/num_files_basic
+        print>>sys.stderr, '    Recall:   ',over_r_e_basic*1.0/num_files_basic
+        print>>sys.stderr, '  Target:'
+        print>>sys.stderr, '    Precision:',over_p_t_basic*1.0/num_files_basic
+        print>>sys.stderr, '    Recall:   ',over_r_t_basic*1.0/num_files_basic
+        print>>sys.stderr, '  Holder:'
+        print>>sys.stderr, '    Precision:',over_p_h_basic*1.0/num_files_basic
+        print>>sys.stderr, '    Recall:   ',over_r_h_basic*1.0/num_files_basic
+        print>>sys.stderr, '  Relation:'
+        print>>sys.stderr, '    Exp-Tar'
+        print>>sys.stderr, '      Prec:',over_p_e_t_basic*1.0/num_files_basic
+        print>>sys.stderr, '      Rec: ',over_r_e_t_basic*1.0/num_files_basic
+        print>>sys.stderr, '    Exp-Hol'
+        print>>sys.stderr, '      Prec:',over_p_e_h_basic*1.0/num_files_basic
+        print>>sys.stderr, '      Rec: ',over_r_e_h_basic*1.0/num_files_basic
+        print>>sys.stderr, '#'*30
+        print>>sys.stderr
         all_files_basic +=  num_files_basic
         all_p_e_basic +=over_p_e_basic
         all_r_e_basic += over_r_e_basic
@@ -454,99 +498,121 @@ if __name__ == '__main__':
         all_r_e_t_basic += over_r_e_t_basic
         all_p_e_h_basic += over_p_e_h_basic
         all_r_e_h_basic += over_r_e_h_basic
-        break
-        #if num==3:
-        #    break
+        ##break   ## JUST FOR ONE
+
     
         
     ## NEXT FOLD!!!   
-    print
-    print '#'*30
-    print 'FINAL DELUXE OVERALL RESULTS FOR ALL FOLDS (microaverage)'
-    print 'Total Num files:',all_files
-    print 'Total num folds:',num
-    print '  Expression:'
-    print '    Precision:',all_p_e*1.0/all_files
-    print '    Recall:   ',all_r_e*1.0/all_files
-    print '  Target:'
-    print '    Precision:',all_p_t*1.0/all_files
-    print '    Recall:   ',all_r_t*1.0/all_files
-    print '  Holder:'
-    print '    Precision:',all_p_h*1.0/all_files
-    print '    Recall:   ',all_r_h*1.0/all_files
-    print '  Relation:'
-    print '    Exp-Tar'
-    print '      Prec:',all_p_e_t*1.0/all_files
-    print '      Rec: ',all_r_e_t*1.0/all_files
-    print '    Exp-Hol'
-    print '      Prec:',all_p_e_h*1.0/all_files
-    print '      Rec: ',all_r_e_h*1.0/all_files
-    print '#'*30
-    print    
+    print>>sys.stderr
+    print>>sys.stderr, '#'*30
+    print>>sys.stderr, 'FINAL DELUXE OVERALL RESULTS FOR ALL FOLDS (microaverage)'
+    print>>sys.stderr, 'Total Num files:',all_files
+    print>>sys.stderr, 'Total num folds:',num
+    print>>sys.stderr, '  Expression:'
+    print>>sys.stderr, '    Precision:',all_p_e*1.0/all_files
+    print>>sys.stderr, '    Recall:   ',all_r_e*1.0/all_files
+    print>>sys.stderr, '  Target:'
+    print>>sys.stderr, '    Precision:',all_p_t*1.0/all_files
+    print>>sys.stderr, '    Recall:   ',all_r_t*1.0/all_files
+    print>>sys.stderr, '  Holder:'
+    print>>sys.stderr, '    Precision:',all_p_h*1.0/all_files
+    print>>sys.stderr, '    Recall:   ',all_r_h*1.0/all_files
+    print>>sys.stderr, '  Relation:'
+    print>>sys.stderr, '    Exp-Tar'
+    print>>sys.stderr, '      Prec:',all_p_e_t*1.0/all_files
+    print>>sys.stderr, '      Rec: ',all_r_e_t*1.0/all_files
+    print>>sys.stderr, '    Exp-Hol'
+    print>>sys.stderr, '      Prec:',all_p_e_h*1.0/all_files
+    print>>sys.stderr, '      Rec: ',all_r_e_h*1.0/all_files
+    print>>sys.stderr, '#'*30
+    print>>sys.stderr   
     
-    print 'LATEX DELUXE'
-    print '\\begin{table}'
-    print '\\begin{tabular}{c|c|c|}'
-    print '\\hline'
-    print 'Type & Precision & Recall\\\\'
-    print '\\hline'
-    print 'Expression & %.2f & %.2f\\\\' % (all_p_e*1.0/all_files,all_r_e*1.0/all_files)
-    print 'Target & %.2f & %.2f \\\\' % (all_p_t*1.0/all_files,all_r_t*1.0/all_files)
-    print 'Holder & %.2f & %.2f \\\\' % (all_p_h*1.0/all_files,all_r_h*1.0/all_files)
-    print '\\hline'
-    print 'Exp-Tar & %.2f & %.2f\\\\' % (all_p_e_t*1.0/all_files,all_r_e_t*1.0/all_files)
-    print 'Exp-Hol & %.2f & %.2f\\\\' % (all_p_e_h*1.0/all_files,all_r_e_h*1.0/all_files)
-    print '\\hline'
-    print '\\end{tabular}'
-    print '\\caption{Caption here}'
-    print '\\end{table}'
+    print>>sys.stderr, 'LATEX DELUXE'
+    print>>sys.stderr, '\\begin{table}'
+    print>>sys.stderr, '\\begin{tabular}{c|c|c|}'
+    print>>sys.stderr, '\\hline'
+    print>>sys.stderr, 'Type & Precision & Recall\\\\'
+    print>>sys.stderr, '\\hline'
+    print>>sys.stderr, 'Expression & %.2f & %.2f\\\\' % (all_p_e*1.0/all_files,all_r_e*1.0/all_files)
+    print>>sys.stderr, 'Target & %.2f & %.2f \\\\' % (all_p_t*1.0/all_files,all_r_t*1.0/all_files)
+    print>>sys.stderr, 'Holder & %.2f & %.2f \\\\' % (all_p_h*1.0/all_files,all_r_h*1.0/all_files)
+    print>>sys.stderr, '\\hline'
+    print>>sys.stderr, 'Exp-Tar & %.2f & %.2f\\\\' % (all_p_e_t*1.0/all_files,all_r_e_t*1.0/all_files)
+    print>>sys.stderr, 'Exp-Hol & %.2f & %.2f\\\\' % (all_p_e_h*1.0/all_files,all_r_e_h*1.0/all_files)
+    print>>sys.stderr, '\\hline'
+    print>>sys.stderr, '\\end{tabular}'
+    print>>sys.stderr, '\\caption{Caption here}'
+    print>>sys.stderr, '\\end{table}'
 
 
-    print
-    print '#'*30
-    print 'FINAL OVERALL BASIC RESULTS FOR ALL FOLDS (microaverage)'
-    print 'Total Num files:',all_files_basic
-    print 'Total num folds:',num
-    print '  Expression:'
-    print '    Precision:',all_p_e_basic*1.0/all_files_basic
-    print '    Recall:   ',all_r_e_basic*1.0/all_files_basic
-    print '  Target:'
-    print '    Precision:',all_p_t_basic*1.0/all_files_basic
-    print '    Recall:   ',all_r_t_basic*1.0/all_files_basic
-    print '  Holder:'
-    print '    Precision:',all_p_h_basic*1.0/all_files_basic
-    print '    Recall:   ',all_r_h_basic*1.0/all_files_basic
-    print '  Relation:'
-    print '    Exp-Tar'
-    print '      Prec:',all_p_e_t_basic*1.0/all_files_basic
-    print '      Rec: ',all_r_e_t_basic*1.0/all_files_basic
-    print '    Exp-Hol'
-    print '      Prec:',all_p_e_h_basic*1.0/all_files_basic
-    print '      Rec: ',all_r_e_h_basic*1.0/all_files_basic
-    print '#'*30
-    print    
+    print>>sys.stderr
+    print>>sys.stderr, '#'*30
+    print>>sys.stderr, 'FINAL OVERALL BASIC RESULTS FOR ALL FOLDS (microaverage)'
+    print>>sys.stderr, 'Total Num files:',all_files_basic
+    print>>sys.stderr, 'Total num folds:',num
+    print>>sys.stderr, '  Expression:'
+    print>>sys.stderr, '    Precision:',all_p_e_basic*1.0/all_files_basic
+    print>>sys.stderr, '    Recall:   ',all_r_e_basic*1.0/all_files_basic
+    print>>sys.stderr, '  Target:'
+    print>>sys.stderr, '    Precision:',all_p_t_basic*1.0/all_files_basic
+    print>>sys.stderr, '    Recall:   ',all_r_t_basic*1.0/all_files_basic
+    print>>sys.stderr, '  Holder:'
+    print>>sys.stderr, '    Precision:',all_p_h_basic*1.0/all_files_basic
+    print>>sys.stderr, '    Recall:   ',all_r_h_basic*1.0/all_files_basic
+    print>>sys.stderr, '  Relation:'
+    print>>sys.stderr, '    Exp-Tar'
+    print>>sys.stderr, '      Prec:',all_p_e_t_basic*1.0/all_files_basic
+    print>>sys.stderr, '      Rec: ',all_r_e_t_basic*1.0/all_files_basic
+    print>>sys.stderr, '    Exp-Hol'
+    print>>sys.stderr, '      Prec:',all_p_e_h_basic*1.0/all_files_basic
+    print>>sys.stderr, '      Rec: ',all_r_e_h_basic*1.0/all_files_basic
+    print>>sys.stderr, '#'*30
+    print>>sys.stderr    
     
-    print 'LATEX BASIC'
-    print '\\begin{table}'
-    print '\\begin{tabular}{c|c|c|}'
-    print '\\hline'
-    print 'Type & Precision & Recall\\\\'
-    print '\\hline'
-    print 'Expression & %.2f & %.2f\\\\' % (all_p_e_basic*1.0/all_files_basic,all_r_e_basic*1.0/all_files_basic)
-    print 'Target & %.2f & %.2f \\\\' % (all_p_t_basic*1.0/all_files_basic,all_r_t_basic*1.0/all_files_basic)
-    print 'Holder & %.2f & %.2f \\\\' % (all_p_h_basic*1.0/all_files_basic,all_r_h_basic*1.0/all_files_basic)
-    print '\\hline'
-    print 'Exp-Tar & %.2f & %.2f\\\\' % (all_p_e_t_basic*1.0/all_files_basic,all_r_e_t_basic*1.0/all_files_basic)
-    print 'Exp-Hol & %.2f & %.2f\\\\' % (all_p_e_h_basic*1.0/all_files_basic,all_r_e_h_basic*1.0/all_files_basic)
-    print '\\hline'
-    print '\\end{tabular}'
-    print '\\caption{Caption here}'
-    print '\\end{table}'
+    print>>sys.stderr, 'LATEX BASIC'
+    print>>sys.stderr, '\\begin{table}'
+    print>>sys.stderr, '\\begin{tabular}{c|c|c|}'
+    print>>sys.stderr, '\\hline'
+    print>>sys.stderr, 'Type & Precision & Recall\\\\'
+    print>>sys.stderr, '\\hline'
+    print>>sys.stderr, 'Expression & %.2f & %.2f\\\\' % (all_p_e_basic*1.0/all_files_basic,all_r_e_basic*1.0/all_files_basic)
+    print>>sys.stderr, 'Target & %.2f & %.2f \\\\' % (all_p_t_basic*1.0/all_files_basic,all_r_t_basic*1.0/all_files_basic)
+    print>>sys.stderr, 'Holder & %.2f & %.2f \\\\' % (all_p_h_basic*1.0/all_files_basic,all_r_h_basic*1.0/all_files_basic)
+    print>>sys.stderr, '\\hline'
+    print>>sys.stderr, 'Exp-Tar & %.2f & %.2f\\\\' % (all_p_e_t_basic*1.0/all_files_basic,all_r_e_t_basic*1.0/all_files_basic)
+    print>>sys.stderr, 'Exp-Hol & %.2f & %.2f\\\\' % (all_p_e_h_basic*1.0/all_files_basic,all_r_e_h_basic*1.0/all_files_basic)
+    print>>sys.stderr, '\\hline'
+    print>>sys.stderr, '\\end{tabular}'
+    print>>sys.stderr, '\\caption{Caption here}'
+    print>>sys.stderr, '\\end{table}'
+    
+    
+    if arguments.out_folds is not None:
+        arguments.out_folds.write("\\end{tabular}\n")
+        arguments.out_folds.write("\\end{table}\n")
+        arguments.out_folds.close()
+        
+    ##Output for Latex
+    print "%s Deluxe & %.2f & %.2f & %.2f & %.2f & %.2f & %.2f & %.2f & %.2f & %.2f & %.2f\\\\" % (arguments.exp_id,
+                                                                                                   all_p_e  * 1.0 /all_files,all_r_e  *1.0/all_files,
+                                                                                                   all_p_t  * 1.0 /all_files,all_r_t  *1.0/all_files,
+                                                                                                   all_p_h  * 1.0 /all_files,all_r_h  *1.0/all_files,
+                                                                                                   all_p_e_t * 1.0/all_files,all_r_e_t*1.0/all_files,
+                                                                                                   all_p_e_h * 1.0/all_files,all_r_e_h*1.0/all_files
+                                                                                                   )
+    print "%s Basic & %.2f & %.2f & %.2f & %.2f & %.2f & %.2f & %.2f & %.2f & %.2f & %.2f\\\\" % (arguments.exp_id,
+                                                                                                   all_p_e_basic  *1.0/all_files_basic,all_r_e_basic  *1.0/all_files_basic,
+                                                                                                   all_p_t_basic  *1.0/all_files_basic,all_r_t_basic  *1.0/all_files_basic,
+                                                                                                   all_p_h_basic  *1.0/all_files_basic,all_r_h_basic  *1.0/all_files_basic,
+                                                                                                   all_p_e_t_basic*1.0/all_files_basic,all_r_e_t_basic*1.0/all_files_basic,
+                                                                                                   all_p_e_h_basic*1.0/all_files_basic,all_r_e_h_basic*1.0/all_files_basic
+                                                                                                   )
+                                                                                                    
      
         
         
         
         
     
-    # Proceed with the evaluation
+    sys.exit(0)
     

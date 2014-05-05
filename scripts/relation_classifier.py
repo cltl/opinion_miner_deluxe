@@ -9,7 +9,7 @@ import os
 config_manager = None
 
     
-def link_exp_tar(expressions,targets, knaf_obj,use_dependencies=True):
+def link_exp_tar(expressions,targets, knaf_obj,use_dependencies=True,use_tokens=True, use_lemmas=True):
     assigned_targets = []  #     (expression_type, exp_ids, 
 
     if len(targets) == 0:
@@ -25,7 +25,7 @@ def link_exp_tar(expressions,targets, knaf_obj,use_dependencies=True):
         examples_file = NamedTemporaryFile(delete=False)
         for exp_ids in expressions:
             for tar_ids in targets:
-                feats = extract_feats_exp_tar(exp_ids,tar_ids,knaf_obj, use_dependencies=use_dependencies)
+                feats = extract_feats_exp_tar(exp_ids,tar_ids,knaf_obj, use_dependencies=use_dependencies,use_tokens=use_tokens,use_lemmas=use_lemmas)
                 feat_index.encode_example_for_classification(feats, examples_file,my_class='0')
         examples_file.close()
         ## In examples_file.name we can find the examples file
@@ -74,7 +74,7 @@ def link_exp_tar(expressions,targets, knaf_obj,use_dependencies=True):
         os.remove(examples_file.name)                
     return assigned_targets
 
-def link_exp_tar_all(expressions,targets, knaf_obj,use_dependencies=True):
+def link_exp_tar_all(expressions,targets, knaf_obj,threshold, use_dependencies=True,use_tokens=True, use_lemmas=True):
     pairs = []
 
     if len(targets) == 0:
@@ -87,7 +87,7 @@ def link_exp_tar_all(expressions,targets, knaf_obj,use_dependencies=True):
         examples_file = NamedTemporaryFile(delete=False)
         for exp_ids, exp_type in expressions:
             for tar_ids in targets:
-                feats = extract_feats_exp_tar(exp_ids,tar_ids,knaf_obj, use_dependencies=use_dependencies)
+                feats = extract_feats_exp_tar(exp_ids,tar_ids,knaf_obj, use_dependencies=use_dependencies,use_tokens=use_tokens,use_lemmas=use_lemmas)
                 feat_index.encode_example_for_classification(feats, examples_file,my_class='0')
         examples_file.close()
          
@@ -112,15 +112,12 @@ def link_exp_tar_all(expressions,targets, knaf_obj,use_dependencies=True):
         os.remove(examples_file.name)                
     return pairs
 
-def link_exp_hol(expressions,holders, knaf_obj,use_dependencies=True):
+def link_exp_hol(expressions,holders, knaf_obj,threshold_hol,use_dependencies=True,use_tokens=True,use_lemmas=True):
     assigned_holders = []  #     (expression_type, exp_ids, 
 
     if len(holders) == 0:
         for exp_ids in expressions:
             assigned_holders.append([])
-    elif len(holders) == 1:
-        for exp_ids in expressions:
-            assigned_holders.append(holders[0])
     else:
         feat_index_filename = config_manager.get_index_features_exp_hol_filename()
         feat_index = Cfeature_index()
@@ -128,7 +125,7 @@ def link_exp_hol(expressions,holders, knaf_obj,use_dependencies=True):
         examples_file = NamedTemporaryFile(delete=False)
         for exp_ids in expressions:
             for hol_ids in holders:
-                feats = extract_feats_exp_hol(exp_ids,hol_ids,knaf_obj, use_dependencies=use_dependencies)
+                feats = extract_feats_exp_hol(exp_ids,hol_ids,knaf_obj, use_dependencies=use_dependencies,use_tokens=use_tokens,use_lemmas=use_lemmas)
                 feat_index.encode_example_for_classification(feats,examples_file,my_class='0')
         examples_file.close()
         ## In examples_file.name we can find the examples file
@@ -163,8 +160,10 @@ def link_exp_hol(expressions,holders, knaf_obj,use_dependencies=True):
         #print selected
         
         for best_hol_idx, best_value in selected:
-            assigned_holders.append(holders[best_hol_idx])
-                
+            if best_value >= threshold_hol:
+                assigned_holders.append(holders[best_hol_idx])
+            else:
+                assigned_holders.append([])
         os.remove(examples_file.name)
     return assigned_holders
 
@@ -225,20 +224,25 @@ def link_entities_svm(expressions, targets, holders, knaf_obj,this_config_manage
         all_hol_ids.append(hol_term_ids)
     
     #assigned_targets = link_exp_tar(all_exp_ids, all_tar_ids,knaf_obj)
-    pairs_exp_tar = link_exp_tar_all(all_exp_ids, all_tar_ids, knaf_obj)
+    
+    svm_thres_exp_tar = config_manager.get_svm_threshold_exp_tar()
+    use_deps_now = config_manager.get_use_dependencies()
+    use_tokens_lemmas = config_manager.get_use_training_lexicons()
+    pairs_exp_tar = link_exp_tar_all(all_exp_ids, all_tar_ids, knaf_obj,svm_thres_exp_tar,use_dependencies=use_deps_now,use_tokens=use_tokens_lemmas,use_lemmas=use_tokens_lemmas)
     
     results = []
+    sets_exp_ids = []
     for exp_ids, exp_type, tar_ids in pairs_exp_tar:
-        results.append((exp_type,exp_ids,tar_ids,[]))
-    return results
-    
-    #assigned_holders = link_exp_hol(all_exp_ids, all_hol_ids, knaf_obj)
-    
+        sets_exp_ids.append(exp_ids)
 
+
+    # The holders are calculated in the old fashion
+    svm_thres_exp_hol = config_manager.get_svm_threshold_exp_hol()
+    assigned_holders = link_exp_hol(sets_exp_ids, all_hol_ids,knaf_obj,svm_thres_exp_hol,use_dependencies=use_deps_now,use_tokens=use_tokens_lemmas,use_lemmas=use_tokens_lemmas)
     
-    results = []
-    for index, exp_type in enumerate(all_types):
-        results.append((exp_type,all_exp_ids[index], assigned_targets[index],  assigned_holders[index]))
+    for index, (exp_ids, exp_type, tar_ids) in enumerate(pairs_exp_tar):
+        results.append((exp_type,exp_ids,tar_ids,assigned_holders[index]))
+
     del config_manager
     config_manager = None
     return results

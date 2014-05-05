@@ -87,6 +87,7 @@ def extract_features(kaf_naf_obj):
     err_file = out_file+'.log'
     
     expressions_lexicon = None
+    targets_lexicon = None
     if my_config_manager.get_use_training_lexicons():
         expression_lexicon_filename = my_config_manager.get_expression_lexicon_filename()
         target_lexicon_filename = my_config_manager.get_target_lexicon_filename()

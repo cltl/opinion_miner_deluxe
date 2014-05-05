@@ -139,14 +139,34 @@ def extract_all_features():
     if my_config_manager.get_use_training_lexicons():
         # Create the lexicons
         
+        ##GUESS THE LANG:
+        first_train_file = train_files[0]
+        obj = KafNafParser(first_train_file)
+        lang = obj.get_language()
+        
         expression_lexicon_filename = my_config_manager.get_expression_lexicon_filename()
         target_lexicon_filename = my_config_manager.get_target_lexicon_filename()
         
         
-        path_to_lex_creator = '/home/izquierdo/opener_repos/opinion-domain-lexicon-acquisition/acquire_from_annotated_data.py'
-        training_filename = my_config_manager.get_file_training_list()
-        lexicons_manager.create_lexicons(path_to_lex_creator,training_filename,expression_lexicon_filename,target_lexicon_filename)
+        this_exp_lex = my_config_manager.get_use_this_expression_lexicon()            
+        this_tar_lex = my_config_manager.get_use_this_target_lexicon()
+
         
+        if this_exp_lex is None or this_tar_lex is None:
+            path_to_lex_creator = '/home/izquierdo/opener_repos/opinion-domain-lexicon-acquisition/acquire_from_annotated_data.py'
+            training_filename = my_config_manager.get_file_training_list()
+            lexicons_manager.create_lexicons(path_to_lex_creator,training_filename,expression_lexicon_filename,target_lexicon_filename)
+        
+        ##Once created we have to copy the previous one in case:
+        if this_exp_lex is not None:
+            if "$LANG" in this_exp_lex:
+                this_exp_lex = this_exp_lex.replace('$LANG',lang)
+            shutil.copy(this_exp_lex, expression_lexicon_filename)
+            
+        if this_tar_lex is not None:
+            if "$LANG" in this_tar_lex:
+                this_tar_lex = this_tar_lex.replace('$LANG',lang)
+            shutil.copy(this_tar_lex,target_lexicon_filename)
         
         expressions_lexicon = lexicons_manager.load_lexicon(expression_lexicon_filename)
         targets_lexicon =  lexicons_manager.load_lexicon(target_lexicon_filename)
@@ -154,7 +174,9 @@ def extract_all_features():
         
         
 
- 
+    ## Configuration for the relational alcasifier
+    use_deps_now = my_config_manager.get_use_dependencies()
+    use_toks_lems_now = my_config_manager.get_use_tokens_lemmas()
       
     accepted_opinions = my_config_manager.get_mapping_valid_opinions()
     use_dependencies_now = my_config_manager.get_use_dependencies()
@@ -175,8 +197,8 @@ def extract_all_features():
             print>>exp_tar_rel_fic,'#'+train_file
             print>>exp_hol_rel_fic,'#'+train_file
             # SET valid_opinions to None to use all the possible opinions in the KAF file for extracitng relations 
-            create_rel_exp_tar_training(kaf_naf_obj, output=exp_tar_rel_fic, valid_opinions=accepted_opinions,use_dependencies=use_dependencies_now)
-            create_rel_exp_hol_training(kaf_naf_obj ,output=exp_hol_rel_fic, valid_opinions=accepted_opinions,use_dependencies=use_dependencies_now) 
+            create_rel_exp_tar_training(kaf_naf_obj, output=exp_tar_rel_fic, valid_opinions=accepted_opinions,use_dependencies=use_dependencies_now,use_tokens=use_toks_lems_now,use_lemmas=use_toks_lems_now)
+            create_rel_exp_hol_training(kaf_naf_obj ,output=exp_hol_rel_fic, valid_opinions=accepted_opinions,use_dependencies=use_dependencies_now,use_tokens=use_toks_lems_now,use_lemmas=use_toks_lems_now)
         if False:
         #except Exception as e:
             sys.stdout, sys.stderr = my_stdout, my_stderr

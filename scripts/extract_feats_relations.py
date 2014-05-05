@@ -17,7 +17,6 @@ def write_to_output(my_class,feats, output):
 # for the svm classifier
 def extract_feats_exp_tar(exp_ids,tar_ids,knaf_obj, use_lemmas=True, use_tokens=True, use_dependencies=True):
     all_feats = []
-    use_lemmas = use_tokens = False
     
     data_for_token = {}     # [token_id] -> (word, sentence_id)
     for num_token, token_obj in enumerate(knaf_obj.get_tokens()):
@@ -104,7 +103,6 @@ def extract_feats_exp_tar(exp_ids,tar_ids,knaf_obj, use_lemmas=True, use_tokens=
     else:
         my_dist = 'veryfar'
     all_feats.append(('distExpTar',my_dist))
-    #all_feats.append(('absDist',str(dist))) 
   
     return all_feats
 
@@ -113,7 +111,7 @@ def extract_feats_exp_tar(exp_ids,tar_ids,knaf_obj, use_lemmas=True, use_tokens=
   
         
     
-def create_rel_exp_tar_training(knaf_obj, output=sys.stdout, valid_opinions=None,use_dependencies=True):
+def create_rel_exp_tar_training(knaf_obj, output=sys.stdout, valid_opinions=None,use_dependencies=True,use_tokens=True, use_lemmas=True):
     # Obtain pairs of features for Expression and Target
     pairs = [] # [(Exp,Tar), (E,T), (E,T)....]
     for opinion in knaf_obj.get_opinions():
@@ -144,12 +142,13 @@ def create_rel_exp_tar_training(knaf_obj, output=sys.stdout, valid_opinions=None
             pairs.append((exp_ids,tar_ids))
 
             
+    #extract_feats_exp_tar(exp_ids,tar_ids,knaf_obj, use_lemmas=True, use_tokens=True, use_dependencies=True)
     for idx1, (exp1, tar1) in enumerate(pairs):
-        feats_positive = extract_feats_exp_tar(exp1,tar1,knaf_obj,use_dependencies)
+        feats_positive = extract_feats_exp_tar(exp1,tar1,knaf_obj,use_dependencies=use_dependencies, use_tokens=use_tokens,use_lemmas=use_lemmas)
         write_to_output('+1', feats_positive, output)
         for idx2, (exp2, tar2) in enumerate(pairs):
             if idx1 != idx2:
-                feats_negative = extract_feats_exp_tar(exp1,tar2,knaf_obj,use_dependencies)
+                feats_negative = extract_feats_exp_tar(exp1,tar2,knaf_obj,use_dependencies=use_dependencies, use_tokens=use_tokens,use_lemmas=use_lemmas)
                 write_to_output('-1', feats_negative, output)
                       
     
@@ -159,7 +158,6 @@ def create_rel_exp_tar_training(knaf_obj, output=sys.stdout, valid_opinions=None
 
 def extract_feats_exp_hol(exp_ids,hol_ids,knaf_obj, use_lemmas=True, use_tokens=True, use_dependencies=True):
     all_feats = []
-    use_lemmas = use_tokens = False
     
     data_for_token = {}     # [token_id] -> (word, sentence_id)
     for num_token, token_obj in enumerate(knaf_obj.get_tokens()):
@@ -252,7 +250,7 @@ def extract_feats_exp_hol(exp_ids,hol_ids,knaf_obj, use_lemmas=True, use_tokens=
   
                 
     
-def create_rel_exp_hol_training(knaf_obj, output=sys.stdout, valid_opinions=None,use_dependencies=True):
+def create_rel_exp_hol_training(knaf_obj, output=sys.stdout, valid_opinions=None,use_dependencies=True,use_tokens=True,use_lemmas=True):
        
     # Obtain pairs of features for Expression and Holder
     pairs = [] # [(Exp,Hol), (E,H), (E,H)....]
@@ -286,12 +284,12 @@ def create_rel_exp_hol_training(knaf_obj, output=sys.stdout, valid_opinions=None
     #for feat_exp, feat_tar
     for idx1, (expids1, tarids1) in enumerate(pairs):
         
-        feats_positive = extract_feats_exp_hol(expids1,tarids1,knaf_obj, use_dependencies=use_dependencies)
+        feats_positive = extract_feats_exp_hol(expids1,tarids1,knaf_obj, use_dependencies=use_dependencies,use_tokens=use_tokens,use_lemmas=use_lemmas)
         write_to_output('+1', feats_positive,output)
         
         for idx2, (expids2, tarids2) in enumerate(pairs):
             if idx1 != idx2:
-                feats_negative = extract_feats_exp_hol(expids1,tarids2,knaf_obj, use_dependencies=use_dependencies)
+                feats_negative = extract_feats_exp_hol(expids1,tarids2,knaf_obj, use_dependencies=use_dependencies,use_tokens=use_tokens,use_lemmas=use_lemmas)
                 write_to_output('-1', feats_negative ,output)
     
     

@@ -51,19 +51,27 @@ class Cconfig_manager:
 
     def get_use_dependencies(self):
         use_dependencies = True ##Default
-        if self.config.has_section('features'):
-            if self.config.has_option('features', 'use_dependencies'):
-                use_dependencies = self.config.getboolean('features', 'use_dependencies')
+        if self.config.has_section('relation_features'):
+            if self.config.has_option('relation_features', 'use_dependencies'):
+                use_dependencies = self.config.getboolean('relation_features', 'use_dependencies')
         return use_dependencies
         
         
     def get_use_training_lexicons(self):
         use_lexicons = True ##Default
-        if self.config.has_section('features'):
-            if self.config.has_option('features', 'use_training_lexicons'):
-                use_lexicons = self.config.getboolean('features', 'use_training_lexicons')
+        if self.config.has_section('relation_features'):
+            if self.config.has_option('relation_features', 'use_training_lexicons'):
+                use_lexicons = self.config.getboolean('relation_features', 'use_training_lexicons')
         return use_lexicons   
      
+    def get_use_tokens_lemmas(self):
+        use_them = True
+        if self.config.has_section('relation_features'):
+            if self.config.has_option('relation_features', 'use_tokens_lemmas'):
+                use_them = self.config.getboolean('relation_features', 'use_tokens_lemmas')
+        return use_them
+                
+                
     def set_out_folder(self,o):
         self.out_folder = o
         
@@ -147,12 +155,24 @@ class Cconfig_manager:
     
     ###############
     def get_expression_lexicon_filename(self):
-        #eturn '/home/izquierdo/opener_repos/sentiment-lexicons/lexicons_from_annotations/hotel/nl/expressions.csv'
         my_name = 'polarity_lexicon.csv'
         return os.path.join(self.get_lexicons_folder(),my_name)
 
+    def get_use_this_expression_lexicon(self):
+        use_it = None
+        if self.config.has_section('relation_features'):
+            if self.config.has_option('relation_features', 'use_this_expression_lexicon'):
+                use_it = self.config.get('relation_features', 'use_this_expression_lexicon')
+        return use_it
+  
+    def get_use_this_target_lexicon(self):
+        use_it = None
+        if self.config.has_section('relation_features'):
+            if self.config.has_option('relation_features', 'use_this_target_lexicon'):
+                use_it = self.config.get('relation_features', 'use_this_target_lexicon')
+        return use_it  
+    
     def get_target_lexicon_filename(self):
-        #return '/home/izquierdo/opener_repos/sentiment-lexicons/lexicons_from_annotations/hotel/nl/targets.csv'
         my_name = 'target_lexicon.csv'
         return os.path.join(self.get_lexicons_folder(),my_name)    
     
@@ -201,6 +221,19 @@ class Cconfig_manager:
     
     def get_svm_params(self):
         return self.config.get('svmlight','parameters')
+    
+    
+    def get_svm_threshold_exp_tar(self):
+        thr = -1
+        if self.config.has_option('relation_features', 'exp_tar_threshold'):
+            thr = self.config.getfloat('relation_features', 'exp_tar_threshold')
+        return thr
+  
+    def get_svm_threshold_exp_hol(self):
+        thr = -1
+        if self.config.has_option('relation_features', 'exp_hol_threshold'):
+            thr = self.config.getfloat('relation_features', 'exp_hol_threshold')
+        return thr  
     
     
     # [valid_opinions]
