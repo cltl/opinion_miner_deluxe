@@ -171,6 +171,13 @@ def extract_all_features():
         expressions_lexicon = lexicons_manager.load_lexicon(expression_lexicon_filename)
         targets_lexicon =  lexicons_manager.load_lexicon(target_lexicon_filename)
         
+        this_propagation_lexicon = my_config_manager.get_propagation_lexicon_name()
+        if this_propagation_lexicon is not None:
+            if "$LANG" in this_propagation_lexicon:
+                this_propagation_lexicon = this_propagation_lexicon.replace('$LANG',lang)
+                
+        print>>sys.stderr,'Propagated lexicon',this_propagation_lexicon
+        
         
         
 
@@ -192,7 +199,11 @@ def extract_all_features():
         if True:
             kaf_naf_obj = KafNafParser(train_file)
             
-            label_feats, separator, pols_skipped_this = extract_features_from_kaf_naf_file(kaf_naf_obj,out_file,err_file, accepted_opinions=accepted_opinions, exp_lex=expressions_lexicon, tar_lex=targets_lexicon)
+            label_feats, separator, pols_skipped_this = extract_features_from_kaf_naf_file(kaf_naf_obj,out_file,err_file, 
+                                                                                           accepted_opinions=accepted_opinions, 
+                                                                                           exp_lex=expressions_lexicon, 
+                                                                                           tar_lex=targets_lexicon,
+                                                                                           propagation_lex_filename=this_propagation_lexicon)
             polarities_found_and_skipped.extend(pols_skipped_this)
             print>>exp_tar_rel_fic,'#'+train_file
             print>>exp_hol_rel_fic,'#'+train_file

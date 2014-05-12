@@ -3,6 +3,7 @@
 import sys
 import codecs
 import csv
+import os
 from operator import itemgetter
 
 #from VUA_pylib.lexicon import MPQA_subjectivity_lexicon
@@ -60,8 +61,24 @@ def get_mapping_from_lexicon(token_ids,lexicon):
     return final_selected 
 
     
+def load_propagation_lexicon(propagation_lex_filename):
+    ##Creates a lexicon (map) [lemma] --> polarity
+    propagated_lexicon = {}
+    if not os.path.exists(propagation_lex_filename):
+        print>>sys.stderr,'The propagated lexicon on', propagation_lex_filename,'does not exist'
+    else:
+        fic = open(propagation_lex_filename,'r')
+        for line in fic:
+            line = line.decode('utf-8').rstrip()
+            tokens = line.split(';')
+            lemma = tokens[4]
+            polarity = tokens[2]
+            propagated_lexicon[lemma] = polarity
+    return propagated_lexicon
+            
+    
 
-def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,log_file=None,include_class=True,accepted_opinions=None, exp_lex= None, tar_lex=None):
+def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,log_file=None,include_class=True,accepted_opinions=None, exp_lex= None, tar_lex=None, propagation_lex_filename=None):
     
     labels = []
     
@@ -111,6 +128,10 @@ def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,log_file=None,incl
     if tar_lex is not None:
         mapping_wid_aspect = get_mapping_from_lexicon(tokens_ids, tar_lex)
         
+    propagated_lex = {}
+    if propagation_lex_filename is not None:
+        #Lexicon of [lemma] ==> polarity
+        propagated_lex = load_propagation_lexicon(propagation_lex_filename)
     
     ###########################
     ## EXTRACTING TERMS #######
@@ -144,8 +165,13 @@ def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,log_file=None,incl
         term_data[term_id] = (term_lemma,term_pos,term_span,polarity)
         for tok_id in term_span:
             term_for_token[tok_id] = term_id
-        sentence_id = token_data[tok_id][1]
-        sentence_for_term[term_id] = sentence_id
+        
+        if tok_id in token_data:
+            sentence_id = token_data[tok_id][1]
+            sentence_for_term[term_id] = sentence_id
+        else:
+            sentence_for_term[term_id] = '0'
+            
     if log_on:
         print>>log_desc,'  Number of terms loaded: '+str(len(term_data))
     ###########################
@@ -308,6 +334,9 @@ def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,log_file=None,incl
                 ### Expression from the domain lexicon
                 polarity_from_domain = mapping_wid_polarity.get(token_id,'-')
                 
+                ## Polarity from the propagated lexicon
+                polarity_from_propagation = propagated_lex.get(term_lemma,'-')
+                
                 ## Target from the training lexicon
                 aspect_from_domain = mapping_wid_aspect.get(token_id,'-')
                 
@@ -318,8 +347,10 @@ def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,log_file=None,incl
                 features = [ sentence_id,  token_id,  token,  term_lemma, term_pos, term_id,   polarity  ,polarity_from_domain,aspect_from_domain]
                 
                 
-                labels.extend(['entity','property','phrase_type','y'])
-                features.extend([entity,property,feature_phrase,this_class])
+                
+                
+                labels.extend(['entity','property','phrase_type','propagation_polarity','y'])
+                features.extend([entity,property,feature_phrase,polarity_from_propagation,this_class])
                 
                 ##############################################################################################
                 ##############################################################################################

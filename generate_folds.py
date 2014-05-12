@@ -31,11 +31,13 @@ def generate_folds(input_file,num_folds,out_folder,name_subfolder='fold'):
     fic.close()
     logging.debug('Loaded '+str(len(elements))+' elements')
     
+    '''
     ##Get just the %percent
     percent = 25
     original_len = len(elements)
     new_len = original_len*percent/100
     elements = elements[:new_len]
+    '''
     
     ## Creating folders and subfolders:
     if os.path.exists(out_folder):

@@ -70,6 +70,13 @@ class Cconfig_manager:
             if self.config.has_option('relation_features', 'use_tokens_lemmas'):
                 use_them = self.config.getboolean('relation_features', 'use_tokens_lemmas')
         return use_them
+    
+    def get_propagation_lexicon_name(self):
+        lexicon_name = None
+        if self.config.has_section('lexicons'):
+            if self.config.has_option('lexicons','propagation_lexicon'):
+                lexicon_name = self.config.get('lexicons','propagation_lexicon')
+        return lexicon_name
                 
                 
     def set_out_folder(self,o):

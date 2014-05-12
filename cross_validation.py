@@ -98,15 +98,21 @@ def map_opinion_labels(input_file,output_file,config_file):
     ##################        
     
     input_kaf = KafNafParser(input_file)
+    remove_these = []
     for opinion in input_kaf.get_opinions():
         exp = opinion.get_expression()
         polarity = exp.get_polarity()
         if polarity in mapping:
             mapped_polarity = mapping[polarity]
         else:
+            opi_id = opinion.get_id()
+            remove_these.append(opi_id)
             mapped_polarity = polarity
             
         exp.set_polarity(mapped_polarity)
+        
+    for opi_id in remove_these:
+        input_kaf.remove_this_opinion(opi_id)
     input_kaf.dump(output_file)
     
     
@@ -147,7 +153,9 @@ def run_basic_version(input_file,output_file):
   cmd.append('--no-opinion-strength')
   fin = open(input_file,'r')
   fout = open(output_file,'w')
-  basic_opinion_miner = Popen(' '.join(cmd),stdin=fin, stdout=fout,stderr=PIPE,shell=True)
+  devnull = open(os.devnull,'wb')
+  basic_opinion_miner = Popen(' '.join(cmd),stdin=fin, stdout=fout,stderr=devnull,shell=True)
+  devnull.close()
   fin.close()
   basic_opinion_miner.wait()
   fout.close()
@@ -294,7 +302,7 @@ if __name__ == '__main__':
 
         list_triple_files = []  #Pairs (gold,out)
         list_test_base_files = []
-        for input_test_file in fold_test_corpora_desc:
+        for cnt, input_test_file in enumerate(fold_test_corpora_desc):
             input_test_file = input_test_file.strip()
             basename_file = os.path.basename(input_test_file)
             list_test_base_files.append(basename_file)
@@ -304,7 +312,8 @@ if __name__ == '__main__':
             # and the output of the system just positive and neative (internal mapping)
             
             map_opinion_labels(input_test_file,folder_gold_triples+'/'+basename_file,this_config)
-            print>>sys.stderr, 'Processing ',basename_file
+            print>>sys.stderr, cnt,'| Processing ',basename_file
+            sys.stderr.flush()
             
             input_test_file  = folder_gold_triples+'/'+basename_file 
             gold_triple_file = folder_gold_triples+'/'+basename_file+'.trp'
@@ -312,6 +321,7 @@ if __name__ == '__main__':
             
             convert_to_triple(arguments.eval_jar_file, input_test_file)
             print>>sys.stderr, '  Created triple gold in',os.path.basename(gold_triple_file)
+            sys.stderr.flush()
             
             ##########################
             #For the deluxe version  #
@@ -322,13 +332,16 @@ if __name__ == '__main__':
             
             tag_file_with_opinions(input_test_file,output_test_file,this_model_folder,remove_existing_opinions=True,include_polarity_strength=False)
             print>>sys.stderr, '  Classified DELUXE in ',os.path.basename(output_test_file)
+            sys.stderr.flush()
                         
             convert_to_triple(arguments.eval_jar_file,output_test_file)
             print>>sys.stderr, '  Created triple deluxe system in',os.path.basename(output_triple_file)    
+            sys.stderr.flush()
             
             # Run the evaluation     
             evaluate_triples(arguments.eval_jar_file, gold_triple_file, output_triple_file, evaluation_folder)
             print>>sys.stderr, '  Evaluated deluxe on',evaluation_folder
+            sys.stderr.flush()
             #########################
             
             ##########################
@@ -338,15 +351,18 @@ if __name__ == '__main__':
             output_triple_file_basic = folder_out_kafs_basic+'/'+basename_file+'.trp' 
             
             #Call to the opinion miner basic and generate output_test_file_basic
+            print>>sys.stderr,'  Start basic version input:',input_test_file,'out',output_test_file_basic
             run_basic_version(input_test_file,output_test_file_basic)
             print>>sys.stderr, '  Classified BASIC in ',os.path.basename(output_test_file_basic)
-        
+            sys.stderr.flush()
+     
             convert_to_triple(arguments.eval_jar_file,output_test_file_basic)
             print>>sys.stderr, '  Created triple basic system in',os.path.basename(output_triple_file_basic)
-            
+            sys.stderr.flush()      
             # Run the evaluation     
             evaluate_triples(arguments.eval_jar_file, gold_triple_file, output_triple_file_basic, evaluation_folder_basic)
             print>>sys.stderr, '  Evaluated basic on',evaluation_folder_basic
+            sys.stderr.flush()
             #########################  
             
                     

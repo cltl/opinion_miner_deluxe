@@ -7,6 +7,7 @@ from tempfile import NamedTemporaryFile
 from subprocess import Popen, PIPE
 import logging
 import cPickle
+import argparse
 
 from scripts import lexicons as lexicons_manager
 from scripts.config_manager import Cconfig_manager, internal_config_filename
@@ -266,7 +267,7 @@ def map_tokens_to_terms(list_tokens,knaf_obj):
         
         
               
-def add_opinions_to_knaf(triples,knaf_obj,text_for_tid,map_to_terms=True,include_polarity_strength=True):
+def add_opinions_to_knaf(triples,knaf_obj,text_for_tid,ids_used, map_to_terms=True,include_polarity_strength=True):
     num_opinion =  0
     for type_exp, span_exp, span_tar, span_hol in triples:
         #Map tokens to terms       
@@ -309,8 +310,17 @@ def add_opinions_to_knaf(triples,knaf_obj,text_for_tid,map_to_terms=True,include
         my_exp.set_comment(exp_text)
         #########################
         
+        #To get the first possible ID not already used
+        new_id = None
+        while True:
+            new_id = 'o'+str(num_opinion+1)
+            if new_id not in ids_used:
+                ids_used.add(new_id)
+                break
+            else:
+                num_opinion += 1
         new_opinion = Copinion(type=knaf_obj.get_type())
-        new_opinion.set_id('o'+str(num_opinion+1))
+        new_opinion.set_id(new_id)
         if len(span_hol_terms) != 0:    #To avoid empty holders
             new_opinion.set_holder(my_hol)
             
@@ -318,7 +328,6 @@ def add_opinions_to_knaf(triples,knaf_obj,text_for_tid,map_to_terms=True,include
             new_opinion.set_target(my_tar)
             
         new_opinion.set_expression(my_exp)
-        num_opinion += 1
         
         knaf_obj.add_opinion(new_opinion)
         
@@ -326,7 +335,7 @@ def add_opinions_to_knaf(triples,knaf_obj,text_for_tid,map_to_terms=True,include
 # Input_file_stream can be a filename of a stream
 # Opoutfile_trasm can be a filename of a stream
 #Config file must be a string filename
-def tag_file_with_opinions(input_file_stream, output_file_stream,model_folder,remove_existing_opinions=True,include_polarity_strength=True):
+def tag_file_with_opinions(input_file_stream, output_file_stream,model_folder,kaf_obj=None, remove_existing_opinions=True,include_polarity_strength=True):
     
     config_filename = os.path.join(model_folder,internal_config_filename)
     if not os.path.exists(config_filename):
@@ -336,8 +345,11 @@ def tag_file_with_opinions(input_file_stream, output_file_stream,model_folder,re
     my_config_manager.set_current_folder(__this_folder)
     my_config_manager.set_config(config_filename)
     
-    
-    knaf_obj = KafNafParser(input_file_stream)
+    if kaf_obj is not None:
+        knaf_obj = kaf_obj
+    else:
+        knaf_obj = KafNafParser(input_file_stream)
+        
     #Create a temporary file
     out_feat_file, err_feat_file = extract_features(knaf_obj)
     if DEBUG:
@@ -364,7 +376,7 @@ def tag_file_with_opinions(input_file_stream, output_file_stream,model_folder,re
         
     for term in knaf_obj.get_terms():
         tid = term.get_id()
-        toks = [text_for_wid[wid] for wid in term.get_span().get_span_ids()]
+        toks = [text_for_wid.get(wid,'') for wid in term.get_span().get_span_ids()]
         text_for_tid[tid] = ' '.join(toks)
 
        
@@ -397,10 +409,15 @@ def tag_file_with_opinions(input_file_stream, output_file_stream,model_folder,re
     
     triples = link_entities_svm(expressions, targets, holders, knaf_obj, my_config_manager)
     
+    ids_used = set()
     if remove_existing_opinions:
         knaf_obj.remove_opinion_layer()
+    else:
+        for opi in knaf_obj.get_opinions():
+            ids_used.add(opi.get_id())
+        
     
-    add_opinions_to_knaf(triples, knaf_obj,text_for_tid,map_to_terms=False,include_polarity_strength=include_polarity_strength)   
+    add_opinions_to_knaf(triples, knaf_obj,text_for_tid,ids_used, map_to_terms=False,include_polarity_strength=include_polarity_strength)   
     
     #Adding linguistic processor
     my_lp = Clp()
@@ -411,11 +428,65 @@ def tag_file_with_opinions(input_file_stream, output_file_stream,model_folder,re
     knaf_obj.dump(output_file_stream)
     
   
+
+def obtain_predefined_model(lang,domain,just_show=False):
+    #This function will read the models from the file models.cfg and will return
+    #The model folder for the lang and domain
+    # format of the file: 1 model per line: lang|domain|path_to_folder
+    model_file = os.path.join(__this_folder,'models.cfg')
+    fic = open(model_file)
+    use_this_model = None
+    if just_show:
+        print '#'*25
+        print 'Models available'
+        print '#'*25
+        
+    nm = 0
+    for line in fic:
+        if line[0]!='#':
+            this_lang, this_domain, this_model,this_desc = line.strip().split('|')
+            if just_show:
+                print '  Model',nm
+                print '    Lang:',this_lang
+                print '    Domain:', this_domain
+                print '    Folder:',this_model
+                print '    Desc:',this_desc
+                nm+= 1
+            else:
+                if this_lang == lang and this_domain == domain:
+                    use_this_model = this_model
+                    break
+    fic.close()
+    if just_show:
+         print '#'*25
+    return use_this_model
         
 if __name__ == '__main__':
-    model_folder = sys.argv[1]
+    
+    argument_parser = argparse.ArgumentParser(description='Detect opinion triples in a KAF/NAF file')
+    group = argument_parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('-m',dest='model_folder',help='Folder storing the trained models')
+    group.add_argument('-d', dest='domain',help='The domain where the models were trained')
+    group.add_argument('-show-models', dest='show_models', action='store_true',help='Show the models available and finish')
+    
+    argument_parser.add_argument('-keep-opinions',dest='keep_opinions',action='store_true',help='Keep the opinions from the input (by default will be deleted)')
+    arguments = argument_parser.parse_args()
+
+    if arguments.show_models:
+        obtain_predefined_model(None,None,just_show=True)
+        sys.exit(0)
         
-    tag_file_with_opinions(sys.stdin, sys.stdout,model_folder)
+    knaf_obj = KafNafParser(sys.stdin)
+    model_folder = None
+    if arguments.model_folder is not None:
+        model_folder = arguments.model_folder
+    else:
+        #Obtain the language
+        lang = knaf_obj.get_language()
+        model_folder = obtain_predefined_model(lang,arguments.domain)
+            
+        
+    tag_file_with_opinions(None, sys.stdout,model_folder,kaf_obj=knaf_obj,remove_existing_opinions=(not arguments.keep_opinions))
     sys.exit(0)
     
     
