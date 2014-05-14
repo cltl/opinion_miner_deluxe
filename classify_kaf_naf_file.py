@@ -335,7 +335,7 @@ def add_opinions_to_knaf(triples,knaf_obj,text_for_tid,ids_used, map_to_terms=Tr
 # Input_file_stream can be a filename of a stream
 # Opoutfile_trasm can be a filename of a stream
 #Config file must be a string filename
-def tag_file_with_opinions(input_file_stream, output_file_stream,model_folder,kaf_obj=None, remove_existing_opinions=True,include_polarity_strength=True):
+def tag_file_with_opinions(input_file_stream, output_file_stream,model_folder,kaf_obj=None, remove_existing_opinions=True,include_polarity_strength=True,timestamp=True):
     
     config_filename = os.path.join(model_folder,internal_config_filename)
     if not os.path.exists(config_filename):
@@ -423,7 +423,10 @@ def tag_file_with_opinions(input_file_stream, output_file_stream,model_folder,ka
     my_lp = Clp()
     my_lp.set_name(__desc)
     my_lp.set_version(__last_edited+'_'+__version)
-    my_lp.set_timestamp()   ##Set to the current date and time
+    if timestamp:
+        my_lp.set_timestamp()   ##Set to the current date and time
+    else:
+        my_lp.set_timestamp('*')
     knaf_obj.add_linguistic_processor('opinions',my_lp)
     knaf_obj.dump(output_file_stream)
     
@@ -470,6 +473,7 @@ if __name__ == '__main__':
     group.add_argument('-show-models', dest='show_models', action='store_true',help='Show the models available and finish')
     
     argument_parser.add_argument('-keep-opinions',dest='keep_opinions',action='store_true',help='Keep the opinions from the input (by default will be deleted)')
+    argument_parser.add_argument('-no-time',dest='timestamp',action='store_false',help='No include time in timestamp (for testing)')
     arguments = argument_parser.parse_args()
 
     if arguments.show_models:
@@ -486,7 +490,7 @@ if __name__ == '__main__':
         model_folder = obtain_predefined_model(lang,arguments.domain)
             
         
-    tag_file_with_opinions(None, sys.stdout,model_folder,kaf_obj=knaf_obj,remove_existing_opinions=(not arguments.keep_opinions))
+    tag_file_with_opinions(None, sys.stdout,model_folder,kaf_obj=knaf_obj,remove_existing_opinions=(not arguments.keep_opinions),timestamp=arguments.timestamp)
     sys.exit(0)
     
     
