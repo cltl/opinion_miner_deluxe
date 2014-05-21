@@ -6,7 +6,79 @@ Opinion miner based on machine learning that can be trained using a list of
 KAF/NAF files. It is important to notice that the opinion miner module will not call
 to any external module to obtain features. It will read all the features from the input KAF/NAF file,
 so you have to make sure that your input file contains all the required information in advance (tokens,
-terms, polarities, constituents, entitiess, dependencies...). There are two basic functionalities:
+terms, polarities, constituents, entitiess, dependencies...). 
+
+The task is general divided into 2 steps
+* Detection of opinion entities (holder, target and expression): using
+Conditional Random Fields
+* Opinion entity linking (expression<-target and expression-<holder): using
+binary Support Vector Machines
+
+In next subsections, a brief explanation of the 2 steps is given.
+
+###Opinion Entity detection###
+
+The first step when extracting opinions from text is to determine which portions of text represent the different opinion entities:
+
+- Opinion expressions: very nice, really ugly ...
+- Opinion targets: the hotel, the rooms, the staff ...
+- Opinion holders: I, our family, the manager ...
+
+In order to do this, three different Conditional Random Fields (CRF) classifiers have been trained using by default this set of features: tokens,
+lemmas, part-of-speech tags, constituent labels and polarity of words and entities. These classifiers detect portions of text representeing differnet opinion
+entities.
+
+
+###Opinion Entity linking###
+
+This step takes as input the opinion entities detected in the previous step, and links them to create the final opinions <expression/target/holder>.
+In this case we have trained two binary Support Vector Machines (SVM), one that indicates the degree of association between a given target and a given expression,
+and another one that gives the degree of linkage between a holder and an opinion expression. So given a list of expressions, a list of targets and holders detected
+by the CRF classifiers, the SVM models try to select the best candidate from the target list for each expressions, and the best holder from the holder list, to create
+the final opinion triple.
+
+Considering a certain opinion expression and a target, these are the features by default used to represent this data for the SVM engine:
+
+1) Textual features: tokens and lemmas of the expression and the target
+2) Distance features: features representing the relative distance of both elements in the text (normalized to a discrete list of possible values: far/medium/close for instance),
+  and if both elements are in the same sentence or not
+3) Dependency features: to indicate the dependency relations between the two elements in the text (dependency path, and dependencies relations with the root of the sentence)
+
+##Requirements##
+This is the list of required libraries:
++ SVMLight: library for Support Vector Machines (http://svmlight.joachims.org/)
++ CRFsuite: library for Conditional Random Fields (http://www.chokkan.org/software/crfsuite/)
++ KafNafParserPy: library for parsing KAF or NAF files (https://github.com/cltl/KafNafParserPy)
++ VUA_pylib: library with functions used by the system (https://github.com/cltl/VUA_pylib)
+
+To install SVMLight and CRFsuite please visit the corresponding webpages and follow the instructions given. For the last two python libraries,
+you will only to clone the repositories and make sure that both are in the python path so Python is able to find them (the easiest way is
+to modify the variable PYTHON_PATH to include the path to these libraries if you don't want to modify your system files).
+
+##Setting the opinion miner##
+
+You will need first to install all the requirements on your local machine and then create a configuration file like this one:
+
+```shell
+[general]
+output_folder = feat
+
+[crfsuite]
+path_to_binary = crfsuite
+
+[svmlight]
+path_to_binary_learn = /home/izquierdo/tools/svm_light/svm_learn
+path_to_binary_classify = /home/izquierdo/tools/svm_light/svm_classify
+````
+
+The `output_folder` variable is the folder where the trained models have been stored. The rest of parameters are the local paths to your installation
+of CRFsuite and SVMLight. This file will be passed to the main script to detect opinions in a new KAF/NAF file:
+
+````shell
+cat my_file.kaf | classify_kaf_naf_file.py your_config_file.cfg
+````
+
+There are two basic functionalities:
 
 * Training: from a corpus of opinion annotated files, induce and learn the models for detecting opinions
 * Classification: using the previous models, find and extract opinions in new text files.
@@ -81,79 +153,6 @@ should call to the program as:
 ```shell
 cat input.nl.kaf | python classify_kaf_naf_file.py -d hotel > output.nl.kaf
 ```
-
-
-##Training##
-
-The task is divided into 2 steps
-* Detection of opinion entities (holder, target and expression): using
-Conditional Random Fields
-* Opinion entity linking (expression<-target and expression-<holder): using
-binary Support Vector Machines
-
-In next subsections, a brief explanation of the 2 steps is given.
-
-###Opinion Entity detection###
-
-The first step when extracting opinions from text is to determine which portions of text represent the different opinion entities:
-
-- Opinion expressions: very nice, really ugly ...
-- Opinion targets: the hotel, the rooms, the staff ...
-- Opinion holders: I, our family, the manager ...
-
-In order to do this, three different Conditional Random Fields (CRF) classifiers have been trained using by default this set of features: tokens,
-lemmas, part-of-speech tags, constituent labels and polarity of words and entities. These classifiers detect portions of text representeing differnet opinion
-entities.
-
-
-###Opinion Entity linking###
-
-This step takes as input the opinion entities detected in the previous step, and links them to create the final opinions <expression/target/holder>.
-In this case we have trained two binary Support Vector Machines (SVM), one that indicates the degree of association between a given target and a given expression,
-and another one that gives the degree of linkage between a holder and an opinion expression. So given a list of expressions, a list of targets and holders detected
-by the CRF classifiers, the SVM models try to select the best candidate from the target list for each expressions, and the best holder from the holder list, to create
-the final opinion triple.
-
-Considering a certain opinion expression and a target, these are the features by default used to represent this data for the SVM engine:
-
-1) Textual features: tokens and lemmas of the expression and the target
-2) Distance features: features representing the relative distance of both elements in the text (normalized to a discrete list of possible values: far/medium/close for instance),
-  and if both elements are in the same sentence or not
-3) Dependency features: to indicate the dependency relations between the two elements in the text (dependency path, and dependencies relations with the root of the sentence)
-
-##Requirements##
-This is the list of required libraries:
-+ SVMLight: library for Support Vector Machines (http://svmlight.joachims.org/)
-+ CRFsuite: library for Conditional Random Fields (http://www.chokkan.org/software/crfsuite/)
-+ KafNafParserPy: library for parsing KAF or NAF files (https://github.com/cltl/KafNafParserPy)
-+ VUA_pylib: library with functions used by the system (https://github.com/cltl/VUA_pylib)
-
-To install SVMLight and CRFsuite please visit the corresponding webpages and follow the instructions given. For the last two python libraries,
-you will only to clone the repositories and make sure that both are in the python path so Python is able to find them (the easiest way is
-to modify the variable PYTHON_PATH to include the path to these libraries if you don't want to modify your system files).
-
-##Setting the opinion miner##
-
-You will need first to install all the requirements on your local machine and then create a configuration file like this one:
-
-```shell
-[general]
-output_folder = feat
-
-[crfsuite]
-path_to_binary = crfsuite
-
-[svmlight]
-path_to_binary_learn = /home/izquierdo/tools/svm_light/svm_learn
-path_to_binary_classify = /home/izquierdo/tools/svm_light/svm_classify
-````
-
-The `output_folder` variable is the folder where the trained models have been stored. The rest of parameters are the local paths to your installation
-of CRFsuite and SVMLight. This file will be passed to the main script to detect opinions in a new KAF/NAF file:
-
-````shell
-cat my_file.kaf | classify_kaf_naf_file.py your_config_file.cfg
-````
 
 ##Training your own models##
 
