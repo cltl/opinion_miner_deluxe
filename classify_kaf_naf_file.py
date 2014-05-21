@@ -16,6 +16,7 @@ from scripts.crfutils import extract_features_to_crf
 from scripts.link_entities_distance import link_entities_distance
 from scripts.relation_classifier import link_entities_svm
 from KafNafParserPy import *
+from subjectivity_detector import classify_sentences
 
 
 DEBUG=0
@@ -30,6 +31,43 @@ __version = '2.0'
 logging.basicConfig(stream=sys.stderr,format='%(asctime)s - %(levelname)s\n  + %(message)s', level=logging.CRITICAL)
 
 terms_for_token = None
+
+
+
+def remove_sentences_no_opinionated(kaf_obj,threshold=0.25):
+       
+    # Get the sentences
+    ids_sentences = {}
+    for token in kaf_obj.get_tokens():
+        value = token.get_text()
+        sent = token.get_sent()
+        if sent not in ids_sentences:
+            ids_sentences[sent] = [value]
+        else:
+            ids_sentences[sent].append(value)
+
+    lang = kaf_obj.get_language()
+    model = '/home/izquierdo/cltl_repos/opinion_miner_deluxe/subjectivity_detector/hotel_new_models/'+lang
+    if not os.path.exists(model):
+        print 'Model file ',model,'does not exist. Skipping'
+        return None
+    
+    ids = ids_sentences.keys()
+    sentences = ids_sentences.values()
+    values = classify_sentences(sentences, model)    
+    sent_ids_to_remove = set()
+    
+    for n, sent in enumerate(sentences):
+        #print ids[n]
+        #print '\t',' '.join(sent).encode('utf-8')
+        #print '\t',values[n]
+        if values[n] < threshold:
+            sent_ids_to_remove.add(ids[n])
+            
+    ##Remove from the input all the sentences with sent id in sent_ids
+    for sent_id in sent_ids_to_remove:
+        kaf_obj.remove_tokens_of_sentence(sent_id)
+        
 
 
 def load_obj_from_file(filename):
@@ -350,15 +388,18 @@ def tag_file_with_opinions(input_file_stream, output_file_stream,model_folder,ka
     else:
         knaf_obj = KafNafParser(input_file_stream)
         
-    #Create a temporary file
-    out_feat_file, err_feat_file = extract_features(knaf_obj)
-    if DEBUG:
-        print>>sys.stderr,'#'*50
-        print>>sys.stderr,'FEATURE FILE'
-        f = open(out_feat_file)
-        print>>sys.stderr,f.read()
-        f.close()
-        print>>sys.stderr,'#'*50
+    ids_used = set()
+    if remove_existing_opinions:
+        knaf_obj.remove_opinion_layer()
+    else:
+        for opi in knaf_obj.get_opinions():
+            ids_used.add(opi.get_id())
+        
+    ##LEAVE ONLY THE SENTENCES THAT MIGHT BE OPINIONATED    
+    remove_sentences_no_opinionated(knaf_obj)  
+
+        
+        
     
     #get all the tokens in order
     list_token_ids = []
@@ -374,11 +415,34 @@ def tag_file_with_opinions(input_file_stream, output_file_stream,model_folder,ka
         list_token_ids.append(w_id)
         sentence_for_token[w_id] = s_id
         
+    if len(list_token_ids) == 0: #There are no tokens because the subjectivy detector removed all of them...
+        my_lp = Clp()
+        my_lp.set_name(__desc)
+        my_lp.set_version(__last_edited+'_'+__version)
+        if timestamp:
+            my_lp.set_timestamp()   ##Set to the current date and time
+        else:
+            my_lp.set_timestamp('*')
+        knaf_obj.add_linguistic_processor('opinions',my_lp)
+        knaf_obj.dump(output_file_stream)
+        sys.exit(0)
+        #DONE
+        
     for term in knaf_obj.get_terms():
         tid = term.get_id()
         toks = [text_for_wid.get(wid,'') for wid in term.get_span().get_span_ids()]
         text_for_tid[tid] = ' '.join(toks)
 
+    #Create a temporary file
+    out_feat_file, err_feat_file = extract_features(knaf_obj)
+    if DEBUG:
+        print>>sys.stderr,'#'*50
+        print>>sys.stderr,'FEATURE FILE'
+        f = open(out_feat_file)
+        print>>sys.stderr,f.read()
+        f.close()
+        print>>sys.stderr,'#'*50
+    
        
     expressions = detect_expressions(out_feat_file,list_token_ids)
     targets = detect_targets(out_feat_file, list_token_ids)

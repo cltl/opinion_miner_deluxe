@@ -99,11 +99,13 @@ def map_opinion_labels(input_file,output_file,config_file):
     
     input_kaf = KafNafParser(input_file)
     remove_these = []
+    at_least_one_valid_opinion = False
     for opinion in input_kaf.get_opinions():
         exp = opinion.get_expression()
         polarity = exp.get_polarity()
         if polarity in mapping:
             mapped_polarity = mapping[polarity]
+            at_least_one_valid_opinion = True
         else:
             opi_id = opinion.get_id()
             remove_these.append(opi_id)
@@ -114,7 +116,7 @@ def map_opinion_labels(input_file,output_file,config_file):
     for opi_id in remove_these:
         input_kaf.remove_this_opinion(opi_id)
     input_kaf.dump(output_file)
-    
+    return at_least_one_valid_opinion
     
 def extract_figures(evaluation_file):
     fic = open(evaluation_file)
@@ -305,13 +307,16 @@ if __name__ == '__main__':
         for cnt, input_test_file in enumerate(fold_test_corpora_desc):
             input_test_file = input_test_file.strip()
             basename_file = os.path.basename(input_test_file)
-            list_test_base_files.append(basename_file)
             
             # We copy the input KAF file into the gold triple folder doing a mapping
             # of the opinion labels as the input might contain Positive, Negative, Strong
             # and the output of the system just positive and neative (internal mapping)
             
-            map_opinion_labels(input_test_file,folder_gold_triples+'/'+basename_file,this_config)
+            at_least_one_valid_opinion = map_opinion_labels(input_test_file,folder_gold_triples+'/'+basename_file,this_config)
+            if not at_least_one_valid_opinion:
+                print>>sys.stderr,'Skipped',basename_file,'because has no opinons after filtering'
+                continue
+            list_test_base_files.append(basename_file)
             print>>sys.stderr, cnt,'| Processing ',basename_file
             sys.stderr.flush()
             

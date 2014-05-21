@@ -136,6 +136,7 @@ def extract_all_features():
     ### LEXICON FROM THE DOMAIN
     expressions_lexicon = None
     targets_lexicon = None
+    this_propagation_lexicon = None
     if my_config_manager.get_use_training_lexicons():
         # Create the lexicons
         

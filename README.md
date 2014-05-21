@@ -6,7 +6,84 @@ Opinion miner based on machine learning that can be trained using a list of
 KAF/NAF files. It is important to notice that the opinion miner module will not call
 to any external module to obtain features. It will read all the features from the input KAF/NAF file,
 so you have to make sure that your input file contains all the required information in advance (tokens,
-terms, polarities, constituents, entitiess, dependencies...)
+terms, polarities, constituents, entitiess, dependencies...). There are two basic functionalities:
+
+* Training: from a corpus of opinion annotated files, induce and learn the models for detecting opinions
+* Classification: using the previous models, find and extract opinions in new text files.
+
+We provide models already trained and evaluated on hotel, news, attractions and restaurants domains for all the languages covered
+by the OpeNER project. Most of the users will just focus on this classification step, using the models that we provide. Some others
+will need to retrain the system to adapt it to a new domain or language. In the next sections we will introduce these 2 differents
+usages of the opinion miner deluxe
+
+##Classification##
+
+In this case you have the models already trained (either you trained them yourself or got the ones we provide) and you want just to detect
+the opinions in a new file. The input format of your file needs to be valid KAF format. The script that perfoms the classification is the script
+`classify_kaf_naf_file.py`. You can get information about the available parameters by running the script with the parameter -h.
+```shell
+classify_kaf_naf_file.py -h
+usage: classify_kaf_naf_file.py [-h]
+                                (-m MODEL_FOLDER | -d DOMAIN | -show-models)
+                                [-keep-opinions] [-no-time]
+
+Detect opinion triples in a KAF/NAF file
+
+optional arguments:
+  -h, --help       show this help message and exit
+  -m MODEL_FOLDER  Folder storing the trained models
+  -d DOMAIN        The domain where the models were trained
+  -show-models     Show the models available and finish
+  -keep-opinions   Keep the opinions from the input (by default will be deleted)
+  -no-time         No include time in timestamp (for testing)
+```
+
+The script reads the input KAF file from the standard input and will write the output KAF into the standard output. The main parameter is the model that
+will be used. There are two ways of specifyng this parameter:
+* By using the -m FOLDER option, by means of which we can specify that we would like to use exactly the folder stored in the path FOLDER
+* By using the -d DOMAIN option, where DOMAIN is the domain where the model that we want to use was trained.
+
+We can get which are the models available by running:
+```shell
+classify_kaf_naf_file.py -show-models
+#########################
+Models available
+#########################
+  Model 0
+    Lang: en
+    Domain: hotel
+    Folder: final_models/en/hotel_cfg1
+    Desc: Trained with config1 in the last version of hotel annotations
+  Model 1
+    Lang: en
+    Domain: news
+    Folder: final_models/en/news_cfg1
+    Desc: Trained with config1 using only the sentences annotated with news
+....
+....
+```
+
+You can train as use as many models as you want. You will need the file `models.cfg` which contains the metadata about which models
+are available and how to refer to them (the domain). This is an example of the content of this file:
+```shell
+#LANG|domain|pathtomodel|description
+en|hotel|final_models/en/hotel_cfg1|Trained with config1 in the last version of hotel annotations
+en|news|final_models/en/news_cfg1|Trained with config1 using only the sentences annotated with news
+nl|hotel|final_models/nl/hotel_cfg1|Trained with config1 in the last version of hotel annotations
+nl|news|final_models/nl/news_cfg1|Trained with config1 using only the sentences annotated with news
+```
+So in each line a model is specified and represented using 4 fields, the language, the domain identifier (which will be used later to refer to this model),
+the path to the folder and a text with a description. The language for the KAF file will be read directly from the KAF header, and considering this model
+and the domain id provided to the script, the proper model will be loaded and used.
+
+So if you want to tag a file with Dutch text called input.nl.kaf with the models trained on hotel reviews, and store the result on the file output.nl.kaf you just
+should call to the program as:
+```shell
+cat input.nl.kaf | python classify_kaf_naf_file.py -d hotel > output.nl.kaf
+```
+
+
+##Training##
 
 The task is divided into 2 steps
 * Detection of opinion entities (holder, target and expression): using
