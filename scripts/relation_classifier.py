@@ -40,7 +40,7 @@ def link_exp_tar(expressions,targets, knaf_obj,use_dependencies=True,use_tokens=
         
         model_file = config_manager.get_filename_model_exp_tar()
         results = run_svm_classify(examples_file.name, model_file)
-        
+        os.remove(examples_file.name)        
         idx = 0         # This idx will iterate from 0 to num_exp X num_tar
         selected = []   # will stor for each exp --> (best_tar_idx, best_svm_val)
         for exp in expressions:
@@ -93,7 +93,7 @@ def link_exp_tar_all(expressions,targets, knaf_obj,threshold, use_dependencies=T
          
         model_file = config_manager.get_filename_model_exp_tar()
         results = run_svm_classify(examples_file.name, model_file)
-        
+        os.remove(examples_file.name)
         
         threshold = -0.75
         idx = 0
@@ -140,6 +140,7 @@ def link_exp_hol(expressions,holders, knaf_obj,threshold_hol,use_dependencies=Tr
         
         model_file = config_manager.get_filename_model_exp_hol()
         results = run_svm_classify(examples_file.name, model_file)
+        os.remove(examples_file.name)
         
         idx = 0         # This idx will iterate from 0 to num_exp X num_tar
         selected = []   # will stor for each exp --> (best_tar_idx, best_svm_val)
