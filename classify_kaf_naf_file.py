@@ -396,7 +396,7 @@ def tag_file_with_opinions(input_file_stream, output_file_stream,model_folder,ka
             ids_used.add(opi.get_id())
         
     ##LEAVE ONLY THE SENTENCES THAT MIGHT BE OPINIONATED    
-    ##remove_sentences_no_opinionated(knaf_obj)  
+    remove_sentences_no_opinionated(knaf_obj)  
 
         
         

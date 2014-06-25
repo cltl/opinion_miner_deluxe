@@ -111,9 +111,15 @@ def extract_feats_exp_tar(exp_ids,tar_ids,knaf_obj, use_lemmas=True, use_tokens=
   
         
     
-def create_rel_exp_tar_training(knaf_obj, output=sys.stdout, valid_opinions=None,use_dependencies=True,use_tokens=True, use_lemmas=True):
+def create_rel_exp_tar_training(knaf_obj, output=sys.stdout, valid_opinions=None,use_dependencies=True,use_tokens=True, use_lemmas=True, log=None):
     # Obtain pairs of features for Expression and Target
     pairs = [] # [(Exp,Tar), (E,T), (E,T)....]
+    
+    fd_log = None
+    if log is not None:
+        fd_log = open(log,'a')
+        print>>fd_log,'Starting with relational features for exp-tar'
+        
     for opinion in knaf_obj.get_opinions():
         opi_id = opinion.get_id()
         opi_exp = opinion.get_expression()
@@ -144,13 +150,21 @@ def create_rel_exp_tar_training(knaf_obj, output=sys.stdout, valid_opinions=None
             
     #extract_feats_exp_tar(exp_ids,tar_ids,knaf_obj, use_lemmas=True, use_tokens=True, use_dependencies=True)
     for idx1, (exp1, tar1) in enumerate(pairs):
+        if fd_log is not None:
+            print>>fd_log,'Extracting relational features for',idx1, 'of',len(pairs)
         feats_positive = extract_feats_exp_tar(exp1,tar1,knaf_obj,use_dependencies=use_dependencies, use_tokens=use_tokens,use_lemmas=use_lemmas)
         write_to_output('+1', feats_positive, output)
         for idx2, (exp2, tar2) in enumerate(pairs):
             if idx1 != idx2:
+                if fd_log is not None:
+                    print>>fd_log,'  Extracting negative features comparing ',idx1,'and', idx2,'Total of',len(pairs)
                 feats_negative = extract_feats_exp_tar(exp1,tar2,knaf_obj,use_dependencies=use_dependencies, use_tokens=use_tokens,use_lemmas=use_lemmas)
                 write_to_output('-1', feats_negative, output)
-                      
+    
+    if fd_log is not None:
+        print>>fd_log,' DONE'
+        fd_log.close()
+                        
     
 
 

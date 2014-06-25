@@ -305,6 +305,7 @@ def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,log_file=None,incl
         
         #This is required for wrong KAF files that contain missing terms (tokens not linked with terms)
         if term_id is not None:
+            print>>log_desc,'Processing data',term_id
             data = term_data.get(term_id,None)
             if data is not None:
                 term_lemma,term_pos,term_span,polarity = data

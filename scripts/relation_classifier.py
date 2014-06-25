@@ -109,7 +109,6 @@ def link_exp_tar_all(expressions,targets, knaf_obj,threshold, use_dependencies=T
             if not at_least_one:
                 pairs.append((exp,exp_type,[]))
  
-        os.remove(examples_file.name)                
     return pairs
 
 def link_exp_hol(expressions,holders, knaf_obj,threshold_hol,use_dependencies=True,use_tokens=True,use_lemmas=True):
@@ -165,7 +164,6 @@ def link_exp_hol(expressions,holders, knaf_obj,threshold_hol,use_dependencies=Tr
                 assigned_holders.append(holders[best_hol_idx])
             else:
                 assigned_holders.append([])
-        os.remove(examples_file.name)
     return assigned_holders
 
 

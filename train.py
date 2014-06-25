@@ -209,8 +209,13 @@ def extract_all_features():
             print>>exp_tar_rel_fic,'#'+train_file
             print>>exp_hol_rel_fic,'#'+train_file
             # SET valid_opinions to None to use all the possible opinions in the KAF file for extracitng relations 
-            create_rel_exp_tar_training(kaf_naf_obj, output=exp_tar_rel_fic, valid_opinions=accepted_opinions,use_dependencies=use_dependencies_now,use_tokens=use_toks_lems_now,use_lemmas=use_toks_lems_now)
-            create_rel_exp_hol_training(kaf_naf_obj ,output=exp_hol_rel_fic, valid_opinions=accepted_opinions,use_dependencies=use_dependencies_now,use_tokens=use_toks_lems_now,use_lemmas=use_toks_lems_now)
+            create_rel_exp_tar_training(kaf_naf_obj, output=exp_tar_rel_fic, valid_opinions=accepted_opinions,
+                                        use_dependencies=use_dependencies_now,use_tokens=use_toks_lems_now,
+                                        use_lemmas=use_toks_lems_now,
+                                        log=err_file)
+            create_rel_exp_hol_training(kaf_naf_obj ,output=exp_hol_rel_fic, valid_opinions=accepted_opinions,
+                                        use_dependencies=use_dependencies_now,use_tokens=use_toks_lems_now,
+                                        use_lemmas=use_toks_lems_now)
         if False:
         #except Exception as e:
             sys.stdout, sys.stderr = my_stdout, my_stderr
