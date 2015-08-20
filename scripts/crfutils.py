@@ -6,10 +6,24 @@ import sys
 def feature_extractor(X,templates):
     # Apply attribute templates to obtain features (in fact, attributes)
     apply_templates(X, templates)
+    
+    for t in range(len(X)):
+        BOW(X,t,'token',-4,-1)
+        BOW(X,t,'token',1,4)
     if X:
         # Append BOS and EOS features manually
         X[0]['F'].append('__BOS__')     # BOS feature
         X[-1]['F'].append('__EOS__')    # EOS feature
+        
+    
+
+def BOW(X, t, field, begin, end):
+    name = 'bow%s[%d..%d]' % (field, begin, end)
+    for offset in range(begin, end+1):
+        p = t + offset
+        if p not in range(0, len(X)):
+            continue
+        X[t]['F'].append('%s=%s' % (name, X[p][field]))
 
 
 

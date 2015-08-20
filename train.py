@@ -17,12 +17,15 @@ from scripts.config_manager import Cconfig_manager, internal_config_filename
 from scripts.extract_features import extract_features_from_kaf_naf_file
 from scripts.crfutils import extract_features_to_crf    
 from scripts.extract_feats_relations import create_rel_exp_tar_training, create_rel_exp_hol_training
+from scripts.polarity_classifier import extract_features_polarity_classifier_from_kaf
+from scripts.path_finder import *
+from scripts.lexicons import load_lexicons
 from VUA_pylib.io import Cfeature_file, Cfeature_index
 from KafNafParserPy import KafNafParser
 
 
-
-#Globa configuration
+OPINION_EXPRESSION = 'opinion_expression'
+#Global configuration
 my_config_manager = Cconfig_manager()
 
 __this_folder = os.path.dirname(os.path.realpath(__file__))
@@ -97,6 +100,11 @@ def create_folders(config_filename):
     lexicons_folder = my_config_manager.get_lexicons_folder()
     os.mkdir(lexicons_folder)
     logging.debug('Created '+lexicons_folder)
+    
+    ##Folder for the polarity classifier
+    polarity_classifier_folder = my_config_manager.get_polarity_classifier_folder()
+    os.mkdir(polarity_classifier_folder)
+    logging.debug('Created '+polarity_classifier_folder)
 
 def load_training_files():
     file_training_files_cfg = my_config_manager.get_file_training_list()
@@ -119,6 +127,8 @@ def load_training_files():
     
 
              
+           
+
 def extract_all_features():
     train_files = load_training_files()
     logging.debug('Loaded '+str(len(train_files))+' files')
@@ -133,60 +143,19 @@ def extract_all_features():
     rel_exp_hol_filename = my_config_manager.get_relation_exp_hol_training_filename()
     exp_hol_rel_fic = open(rel_exp_hol_filename,'w') 
     
-    ### LEXICON FROM THE DOMAIN
-    expressions_lexicon = None
-    targets_lexicon = None
-    this_propagation_lexicon = None
-    if my_config_manager.get_use_training_lexicons():
-        # Create the lexicons
-        
-        ##GUESS THE LANG:
-        first_train_file = train_files[0]
-        obj = KafNafParser(first_train_file)
-        lang = obj.get_language()
-        
-        expression_lexicon_filename = my_config_manager.get_expression_lexicon_filename()
-        target_lexicon_filename = my_config_manager.get_target_lexicon_filename()
-        
-        
-        this_exp_lex = my_config_manager.get_use_this_expression_lexicon()            
-        this_tar_lex = my_config_manager.get_use_this_target_lexicon()
-
-        
-        if this_exp_lex is None or this_tar_lex is None:
-            path_to_lex_creator = '/home/izquierdo/opener_repos/opinion-domain-lexicon-acquisition/acquire_from_annotated_data.py'
-            training_filename = my_config_manager.get_file_training_list()
-            lexicons_manager.create_lexicons(path_to_lex_creator,training_filename,expression_lexicon_filename,target_lexicon_filename)
-        
-        ##Once created we have to copy the previous one in case:
-        if this_exp_lex is not None:
-            if "$LANG" in this_exp_lex:
-                this_exp_lex = this_exp_lex.replace('$LANG',lang)
-            shutil.copy(this_exp_lex, expression_lexicon_filename)
-            
-        if this_tar_lex is not None:
-            if "$LANG" in this_tar_lex:
-                this_tar_lex = this_tar_lex.replace('$LANG',lang)
-            shutil.copy(this_tar_lex,target_lexicon_filename)
-        
-        expressions_lexicon = lexicons_manager.load_lexicon(expression_lexicon_filename)
-        targets_lexicon =  lexicons_manager.load_lexicon(target_lexicon_filename)
-        
-        this_propagation_lexicon = my_config_manager.get_propagation_lexicon_name()
-        if this_propagation_lexicon is not None:
-            if "$LANG" in this_propagation_lexicon:
-                this_propagation_lexicon = this_propagation_lexicon.replace('$LANG',lang)
-                
-        print>>sys.stderr,'Propagated lexicon',this_propagation_lexicon
-        
-        
-        
+    filename_features_polarity_classifier = my_config_manager.get_filename_features_polarity_classifier()
+    fd_filename_features_polarity_classifier = open(filename_features_polarity_classifier,'w')
+    
+     
 
     ## Configuration for the relational alcasifier
+    use_these_lexicons = []
     use_deps_now = my_config_manager.get_use_dependencies()
     use_toks_lems_now = my_config_manager.get_use_tokens_lemmas()
       
-    accepted_opinions = my_config_manager.get_mapping_valid_opinions()
+    #accepted_opinions = my_config_manager.get_mapping_valid_opinions(map_all_to_this=OPINION_EXPRESSION)
+    accepted_opinions = my_config_manager.get_mapping_valid_opinions(map_all_to_this=None)
+    mapping_positive_negative = my_config_manager.get_mapping_valid_opinions()
     use_dependencies_now = my_config_manager.get_use_dependencies()
     polarities_found_and_skipped = []
     for num_file, train_file in enumerate(train_files):
@@ -195,33 +164,40 @@ def extract_all_features():
         out_file = os.path.join(feat_folder,'file#'+str(num_file)+'#'+base_name+".feat")
         err_file = out_file+'.log'
         
-        #Creates the output file
-        # Returns the labels for the features and the separator used
-        if True:
-            kaf_naf_obj = KafNafParser(train_file)
-            
-            label_feats, separator, pols_skipped_this = extract_features_from_kaf_naf_file(kaf_naf_obj,out_file,err_file, 
-                                                                                           accepted_opinions=accepted_opinions, 
-                                                                                           exp_lex=expressions_lexicon, 
-                                                                                           tar_lex=targets_lexicon,
-                                                                                           propagation_lex_filename=this_propagation_lexicon)
-            polarities_found_and_skipped.extend(pols_skipped_this)
-            print>>exp_tar_rel_fic,'#'+train_file
-            print>>exp_hol_rel_fic,'#'+train_file
-            # SET valid_opinions to None to use all the possible opinions in the KAF file for extracitng relations 
-            create_rel_exp_tar_training(kaf_naf_obj, output=exp_tar_rel_fic, valid_opinions=accepted_opinions,
-                                        use_dependencies=use_dependencies_now,use_tokens=use_toks_lems_now,
-                                        use_lemmas=use_toks_lems_now,
-                                        log=err_file)
-            create_rel_exp_hol_training(kaf_naf_obj ,output=exp_hol_rel_fic, valid_opinions=accepted_opinions,
-                                        use_dependencies=use_dependencies_now,use_tokens=use_toks_lems_now,
-                                        use_lemmas=use_toks_lems_now)
-        if False:
-        #except Exception as e:
-            sys.stdout, sys.stderr = my_stdout, my_stderr
-            print>>sys.stderr,str(e),dir(e)
-            pass
+
+        kaf_naf_obj = KafNafParser(train_file)
+        print>>sys.stderr,'Extracting features from',train_file
         
+        if num_file == 0: #The first time we load the lexicons
+            lang = kaf_naf_obj.get_language()
+            use_these_lexicons = load_lexicons(my_config_manager,lang)
+            
+        label_feats, separator, pols_skipped_this = extract_features_from_kaf_naf_file(kaf_naf_obj,out_file,err_file, 
+                                                                                       accepted_opinions=accepted_opinions, 
+                                                                                       lexicons = use_these_lexicons)
+         
+        polarities_found_and_skipped.extend(pols_skipped_this)
+        print>>exp_tar_rel_fic,'#'+train_file
+        print>>exp_hol_rel_fic,'#'+train_file
+            
+        # SET valid_opinions to None to use all the possible opinions in the KAF file for extracitng relations 
+        # set it valid_opinions = accepted opinions for feiltering
+        '''
+        create_rel_exp_tar_training(kaf_naf_obj, output=exp_tar_rel_fic, valid_opinions=None,
+                                    use_dependencies=use_dependencies_now,use_tokens=use_toks_lems_now,
+                                    use_lemmas=use_toks_lems_now,
+                                    log=err_file)
+        
+        create_rel_exp_hol_training(kaf_naf_obj ,output=exp_hol_rel_fic, valid_opinions=None,
+                                    use_dependencies=use_dependencies_now,use_tokens=use_toks_lems_now,
+                                    use_lemmas=use_toks_lems_now)
+            
+        '''
+        ##Extract features for the polarity classifier
+        #for mpqa there will be no polarity classifier
+        #extract_features_polarity_classifier_from_kaf(kaf_naf_obj,fd_filename_features_polarity_classifier,mapping_positive_negative)
+        
+    fd_filename_features_polarity_classifier.close()
     ##Show just for information how many instances have been skipped becase the polarity of opinion expression was not allowed
     count = defaultdict(int)
     for exp_label in polarities_found_and_skipped:
@@ -266,7 +242,11 @@ def train_expression_classifier():
     crf_out_files = []
     
     templates_exp = my_config_manager.get_templates_expr() 
-    possible_classes = my_config_manager.get_possible_expression_values()
+    #possible_classes = my_config_manager.get_possible_expression_values()
+    possible_classes = [OPINION_EXPRESSION]
+    
+    ##FOR MPQA 
+    possible_classes = ['dse']
       
     # Only set the target class for the tokens of possible_classes
     # For others, it's set to O (out sequence)
@@ -398,11 +378,9 @@ def train_holder_classifier():
 
 def run_crfsuite(crf_params,input_file,model_file):
     
-    crfsuite = my_config_manager.get_crfsuite_binary()
+    crfsuite = get_path_crfsuite()
     if not os.path.exists(crfsuite):
         print>>sys.stderr,'CRFsuite not found on',crfsuite
-        print>>sys.stderr,'Check the config filename and make sure the path is correctly set'
-        print>>sys.stderr,'[crfsuite]\npath_to_binary = yourpathtolocalcrfsuite'
         sys.exit(-1)
         
     cmd = [crfsuite]
@@ -458,7 +436,23 @@ def train_classifier_relation_exp_tar():
     ###########################################
 
 
-
+def train_polarity_classifier():
+    feature_filename = my_config_manager.get_filename_features_polarity_classifier()
+    encoded_filename = feature_filename+'.svm_encoded'
+    index_filename =  my_config_manager.get_filename_index_polarity_classifier()
+    model_filename = my_config_manager.get_filename_model_polarity_classifier()
+    
+    feature_file_obj = Cfeature_file(feature_filename)
+    fd_encoded = open(encoded_filename,'w')
+    index_features = Cfeature_index()
+    index_features.encode_feature_file_to_svm(feature_file_obj,fd_encoded)
+    fd_encoded.close()
+    
+    index_features.save_to_file(index_filename)
+    
+    params = '-x 1 -c 0.1'
+    run_svmlight_learn(encoded_filename, model_filename, params)
+    
 
 def train_classifier_relation_exp_hol():
     #Load the human readable training file    
@@ -491,12 +485,10 @@ def train_classifier_relation_exp_hol():
     
     
 def run_svmlight_learn(example_file,model_file,params):
-    svmlight = my_config_manager.get_svm_learn_binary()
+    svmlight = get_path_svmlight_learn()
     
     if not os.path.exists(svmlight):
         print>>sys.stderr,'SVMlight learn not found on',svmlight
-        print>>sys.stderr,'Check the config filename and make sure the path is correctly set'
-        print>>sys.stderr,'[svmlight]\npath_to_binary_learn = yourpathtolocalsvmlightlearn'
         sys.exit(-1)
         
     cmd = [svmlight]
@@ -534,6 +526,8 @@ def train_all(file_config):
     extract_all_features()
     write_to_flag('DONE extract features\n')
     
+    sys.exit(0)
+    
     # training the expression classifier
     write_to_flag('START training expression classifier')
     train_expression_classifier()
@@ -559,6 +553,12 @@ def train_all(file_config):
     train_classifier_relation_exp_hol()
     write_to_flag('DONE training relation expression - holder classifier\n')
     
+    ##For mpqa this will not be used
+    '''
+    write_to_flag('START training polarity classifier')
+    train_polarity_classifier()
+    write_to_flag('DONE training polarity classifier')
+    '''
     
     logging.debug('ALL TRAINING DONE')
     write_to_flag('FINISHED ')

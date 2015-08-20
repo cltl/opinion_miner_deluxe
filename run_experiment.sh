@@ -16,7 +16,7 @@ folder=$2
 list_files=$3
 experiment_folder=$4
 
-numfolds=5
+numfolds=10
 base_out_folder=`dirname $folder`
 err_file=$base_out_folder/$id.log
 out_per_folds=$base_out_folder/$id.out_per_fold.tex

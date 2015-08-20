@@ -34,7 +34,9 @@ def convert_to_triple(jar_file,input_file):
     cmd.append('--kaf-file')
     cmd.append(input_file)
     cmd.append('--opinion')
-    converter = Popen(' '.join(cmd),shell=True, stderr=sys.stderr)
+    devnull = open(os.devnull,'wb')
+    converter = Popen(' '.join(cmd),shell=True, stderr=sys.stderr, stdout=devnull)
+    devnull.close()
     converter.wait()
     
 '''
@@ -65,10 +67,11 @@ def evaluate_triples(jar_file,gold_triples,system_triples,evaluation_folder):
         cmd.append('--system-triples')
         cmd.append(system_triples)
         cmd.extend(extra_opts)
-    
-               
-        converter = Popen(' '.join(cmd),shell=True, stderr=PIPE, stdout=PIPE)
+            
+        devnull = open(os.devnull,'wb')
+        converter = Popen(' '.join(cmd),shell=True, stderr=sys.stderr, stdout=devnull)
         converter.wait()
+        devnull.close()
         
         # The output must be on system_triples.trp and .log
         # Move it to the evaluation folder with the proper extension
@@ -103,7 +106,10 @@ def map_opinion_labels(input_file,output_file,config_file):
     for opinion in input_kaf.get_opinions():
         exp = opinion.get_expression()
         polarity = exp.get_polarity()
-        if polarity in mapping:
+        if '*' in mapping:  #To handle dse = *
+            mapped_polarity = mapping['*']
+            at_least_one_valid_opinion = True
+        elif polarity in mapping:
             mapped_polarity = mapping[polarity]
             at_least_one_valid_opinion = True
         else:
@@ -150,13 +156,16 @@ def extract_figures(evaluation_file):
 
 
 #This functions calls to the 
-def run_basic_version(input_file,output_file):
+def run_basic_version(input_file,output_file,path_to_expression_lexicon):
   cmd = [path_to_basic]
   cmd.append('--no-opinion-strength')
+  if path_to_expression_lexicon is not None:
+      cmd.append('--lexicon')
+      cmd.append(path_to_expression_lexicon)
   fin = open(input_file,'r')
   fout = open(output_file,'w')
   devnull = open(os.devnull,'wb')
-  basic_opinion_miner = Popen(' '.join(cmd),stdin=fin, stdout=fout,stderr=devnull,shell=True)
+  basic_opinion_miner = Popen(' '.join(cmd), stdin=fin, stdout=fout,stderr=sys.__stderr__,shell=True)
   devnull.close()
   fin.close()
   basic_opinion_miner.wait()
@@ -207,16 +216,17 @@ if __name__ == '__main__':
     # output_folder/fold_[0-9]+    
     
     #With this we generate new folds and so on
-    generate_folds(corpus_filename,arguments.num_folds,output_folder)
+    #generate_folds(corpus_filename,arguments.num_folds,output_folder)
     
     
     ## With this we copy it from a referencre created split of folds
-    '''
-    reference = '/home/izquierdo/cltl_repos/opinion_miner_deluxe/models/hotel_nl_trainandtest_all'
+    
+    
+    reference = '/home/izquierdo/cltl_repos/opinion_miner_deluxe/exp1'
     if os.path.exists(output_folder):
         shutil.rmtree(output_folder)
     shutil.copytree(reference, output_folder)
-    '''
+    
     
     
     if arguments.out_folds is not None:
@@ -254,10 +264,11 @@ if __name__ == '__main__':
         ##################
         
         # We need to run now the training for this folder
-        #def train_all(file_config):
         print>>sys.stderr, 'Training'
         print>>sys.stderr, '  Folder',this_folder,
 
+        #
+        
         this_pid = os.fork()
         if this_pid == 0:
             train_all(this_config)
@@ -269,10 +280,15 @@ if __name__ == '__main__':
                 status = os.waitpid(this_pid,os.WNOHANG)
                 if status[0] != 0:   break
                 time.sleep(1)
-            
+        
         #####
         ## Do the evaluation
         ####
+        ##Check if exists the expression filename, in taht case it will be used for the basic version as well
+        expression_lexicon = None
+        path_to_expression_lexicon = this_model_folder+'/lexicons/polarity_lexicon.csv'
+        if os.path.exists(path_to_expression_lexicon):
+            expression_lexicon = path_to_expression_lexicon
         
 
         folder_out_kafs = this_folder+'/output_files'
@@ -349,6 +365,7 @@ if __name__ == '__main__':
             sys.stderr.flush()
             #########################
             
+            
             ##########################
             #For the basic version   #
             ##########################   
@@ -356,8 +373,8 @@ if __name__ == '__main__':
             output_triple_file_basic = folder_out_kafs_basic+'/'+basename_file+'.trp' 
             
             #Call to the opinion miner basic and generate output_test_file_basic
-            print>>sys.stderr,'  Start basic version input:',input_test_file,'out',output_test_file_basic
-            run_basic_version(input_test_file,output_test_file_basic)
+            #print>>sys.stderr,'  Start basic version input:',input_test_file,'out',output_test_file_basic
+            run_basic_version(input_test_file,output_test_file_basic,expression_lexicon)
             print>>sys.stderr, '  Classified BASIC in ',os.path.basename(output_test_file_basic)
             sys.stderr.flush()
      
@@ -368,10 +385,10 @@ if __name__ == '__main__':
             evaluate_triples(arguments.eval_jar_file, gold_triple_file, output_triple_file_basic, evaluation_folder_basic)
             print>>sys.stderr, '  Evaluated basic on',evaluation_folder_basic
             sys.stderr.flush()
-            #########################  
+            #######################  
             
                     
-
+        
         fold_test_corpora_desc.close()
         
         ## Extract the figures from the excel files
@@ -450,7 +467,8 @@ if __name__ == '__main__':
                                                                                                                         over_r_e_h_basic*1.0/num_files_basic
                                                                                                                         ))
             arguments.out_folds.flush()                                      
-                                                                                                                               
+        
+            ##NEXT FOLD...
             
                     
         print>>sys.stderr
