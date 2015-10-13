@@ -16,7 +16,10 @@ from scripts.crfutils import extract_features_to_crf
 from scripts.link_entities_distance import link_entities_distance
 from scripts.relation_classifier import link_entities_svm
 from KafNafParserPy import *
-from subjectivity_detector import classify_sentences
+try:
+    from subjectivity_detector import classify_sentences
+except:
+    pass
 
 
 DEBUG=0
