@@ -56,14 +56,6 @@ class Cconfig_manager:
                 use_dependencies = self.config.getboolean('relation_features', 'use_dependencies')
         return use_dependencies
         
-    def get_lexicons(self):
-        for lexicon_id, data in self.config.items('lexicons'):
-            fields = data.split(';')
-            lexicon_type = fields[0]
-            lexicon_path = fields[1]
-            yield lexicon_id, lexicon_type, lexicon_path
-            
-                             
         
     def get_use_training_lexicons(self):
         use_lexicons = True ##Default
@@ -95,23 +87,6 @@ class Cconfig_manager:
         outfolder=self.get_output_folder()
         return os.path.join(outfolder,my_name)
                                     
-    def get_polarity_classifier_folder(self):
-        my_name = 'polarity_classifier'
-        outfolder=self.get_output_folder()
-        return os.path.join(outfolder,my_name)
-            
-    def get_filename_features_polarity_classifier(self):
-        my_name = 'examples.features'
-        return os.path.join(self.get_polarity_classifier_folder(),my_name)
-    
-    def get_filename_index_polarity_classifier(self):
-        my_name = 'index.features'
-        return os.path.join(self.get_polarity_classifier_folder(),my_name)
-    
-    def get_filename_model_polarity_classifier(self):
-        my_name = 'model.svm'
-        return os.path.join(self.get_polarity_classifier_folder(),my_name)
-    
     def get_training_dataset_exp(self):
         my_name = 'training_set_exp.crf'
         return os.path.join(self.get_training_datasets_folder(),my_name)
@@ -239,10 +214,17 @@ class Cconfig_manager:
     def get_file_training_list(self):
         return self.config.get('general','filename_training_list')
     
+    def get_crfsuite_binary(self):
+        return self.config.get('crfsuite','path_to_binary')
     
     def get_crfsuite_params(self):
         return self.config.get('crfsuite','parameters')
     
+    def get_svm_learn_binary(self):
+        return self.config.get('svmlight','path_to_binary_learn')
+    
+    def get_svm_classify_binary(self):
+        return self.config.get('svmlight','path_to_binary_classify')
     
     def get_svm_params(self):
         return self.config.get('svmlight','parameters')
@@ -264,17 +246,14 @@ class Cconfig_manager:
     # [valid_opinions]
     # positive = sentiment-neg
     # negative = sentiment-pos
-    def get_mapping_valid_opinions(self, map_all_to_this=None):
+    def get_mapping_valid_opinions(self):
         mapping = {}
         for mapped_opinion, values_in_corpus in self.config.items('valid_opinions'):
-            ##if map_all_to_this is set to something, all opinions will be mapped to that label
-            if map_all_to_this is not None:
-                mapped_opinion = map_all_to_this
             values = [ v for v in values_in_corpus.split(';') if v != '']
             for v in values:
                 mapping[v] = mapped_opinion
         return mapping
-                     
+                
     def get_possible_expression_values(self):
         labels = [key for key,_ in self.config.items('valid_opinions')]
         return labels

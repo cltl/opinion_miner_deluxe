@@ -15,15 +15,8 @@ from scripts.extract_features import extract_features_from_kaf_naf_file
 from scripts.crfutils import extract_features_to_crf 
 from scripts.link_entities_distance import link_entities_distance
 from scripts.relation_classifier import link_entities_svm
-from scripts.path_finder import *
-from scripts.lexicons import load_lexicons
 from KafNafParserPy import *
-try:
-    from subjectivity_detector import classify_sentences
-except:
-    pass
-  
-from scripts.polarity_classifier import classify as polarity_classifier
+from subjectivity_detector import classify_sentences
 
 
 DEBUG=0
@@ -54,9 +47,9 @@ def remove_sentences_no_opinionated(kaf_obj,threshold=0.25):
             ids_sentences[sent].append(value)
 
     lang = kaf_obj.get_language()
-    model = '/home/izquierdo/cltl_repos/opinion_miner_deluxe/subjectivity_detector/hotel_new_models/'+lang
+    model = __this_folder+'/subjectivity_detector/hotel_new_models/'+lang
     if not os.path.exists(model):
-        print 'Model file ',model,'does not exist. Skipping'
+        print>>sys.stderr,'Model file ',model,'does not exist. Skipping'
         return None
     
     ids = ids_sentences.keys()
@@ -134,12 +127,15 @@ def extract_features(kaf_naf_obj):
     
     expressions_lexicon = None
     targets_lexicon = None
-    lang = kaf_naf_obj.get_language()
-    use_these_lexicons = load_lexicons(my_config_manager,lang,on_training=False)
+    if my_config_manager.get_use_training_lexicons():
+        expression_lexicon_filename = my_config_manager.get_expression_lexicon_filename()
+        target_lexicon_filename = my_config_manager.get_target_lexicon_filename()
+        
+        expressions_lexicon = lexicons_manager.load_lexicon(expression_lexicon_filename)
+        targets_lexicon =lexicons_manager.load_lexicon(target_lexicon_filename)
 
-    labels, separator,polarities_skipped = extract_features_from_kaf_naf_file(kaf_naf_obj,out_file,err_file,include_class=False,
-                                                                              lexicons = use_these_lexicons)
-
+    #def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,log_file=None,include_class=True,accepted_opinions=None, exp_lex= None):
+    labels, separator,polarities_skipped = extract_features_from_kaf_naf_file(kaf_naf_obj,out_file,err_file,include_class=False, exp_lex=expressions_lexicon,tar_lex=targets_lexicon)
     return out_file, err_file
              
             
@@ -162,20 +158,24 @@ def convert_to_crf(input_file,templates):
              
              
 def run_crfsuite_tag(input_file,model_file):
-    crfsuite = get_path_crfsuite()
+    crfsuite = my_config_manager.get_crfsuite_binary()
     cmd = [crfsuite]
     if not os.path.exists(crfsuite):
         print>>sys.stderr,'CRFsuite not found on',crfsuite
+        print>>sys.stderr,'Check the config filename and make sure the path is correctly set'
+        print>>sys.stderr,'[crfsuite]\npath_to_binary = yourpathtolocalcrfsuite'
         sys.exit(-1)
 
     cmd.append('tag')
     cmd.append('-m '+model_file)
     cmd.append(input_file)
 
-    crf_process = Popen(' '.join(cmd), stdin=PIPE, stdout=PIPE, stderr=PIPE, shell=True)
-    crf_process.wait()
-    output = crf_process.stdout.read()
-    error = crf_process.stderr.read()
+    ##print>>sys.stderr,' '.join(cmd)
+    crf_process = Popen(' '.join(cmd), stdin=None, stdout=PIPE, stderr=PIPE, shell=True)
+    output, error = crf_process.communicate()
+    #crf_process.wait()
+    #output = crf_process.stdout.read()
+    #error = crf_process.stderr.read()
     return output,error
 
 
@@ -210,7 +210,6 @@ def detect_expressions(tab_feat_file,list_token_ids):
     
     logging.debug('Detector expressions out: '+str(matches_exp))
     os.remove(crf_exp_file)
-    
     return matches_exp
     
     
@@ -245,7 +244,6 @@ def detect_targets(tab_feat_file, list_token_ids):
         print>>sys.stderr,'#'*50
         
     logging.debug('Detector targets out: '+str(matches_tar))
-        
     os.remove(crf_target_file)
     return matches_tar
            
@@ -344,25 +342,8 @@ def add_opinions_to_knaf(triples,knaf_obj,text_for_tid,ids_used, map_to_terms=Tr
         span_exp = Cspan()
         span_exp.create_from_ids(span_exp_terms)
         my_exp = Cexpression()
-        
-        ##Here is the moment to classify 
-        #def classify(kaf_obj,term_ids,index_filename,model_filename, svm_path):
-        
-        #this will not be used for MPQA
-        '''
-        index_filename = my_config_manager.get_filename_index_polarity_classifier()
-        model_filename = my_config_manager.get_filename_model_polarity_classifier()
-        svm_path = get_path_svmlight_classify()
-        pos_neg_label = polarity_classifier(knaf_obj,span_exp,index_filename,model_filename, svm_path)
-        '''
         my_exp.set_span(span_exp)
-        
-        #For mpqa
         my_exp.set_polarity(type_exp)
-
-        ## For else
-        #my_exp.set_polarity(pos_neg_label)
-        
         if include_polarity_strength:
             my_exp.set_strength("1")
         exp_text = ' '.join(text_for_tid[tid] for tid in span_exp_terms)
@@ -408,7 +389,8 @@ def tag_file_with_opinions(input_file_stream, output_file_stream,model_folder,ka
         knaf_obj = kaf_obj
     else:
         knaf_obj = KafNafParser(input_file_stream)
-        
+    
+    
     ids_used = set()
     if remove_existing_opinions:
         knaf_obj.remove_opinion_layer()
@@ -417,9 +399,8 @@ def tag_file_with_opinions(input_file_stream, output_file_stream,model_folder,ka
             ids_used.add(opi.get_id())
         
     ##LEAVE ONLY THE SENTENCES THAT MIGHT BE OPINIONATED    
-    if False:
-        remove_sentences_no_opinionated(knaf_obj) 
-        print>>sys.stderr,'Removed sentences non opinionated' 
+    ## commented till the problem with the missing wf's in the output is fixed
+    ##remove_sentences_no_opinionated(knaf_obj)  
 
         
         
@@ -448,6 +429,7 @@ def tag_file_with_opinions(input_file_stream, output_file_stream,model_folder,ka
             my_lp.set_timestamp('*')
         knaf_obj.add_linguistic_processor('opinions',my_lp)
         knaf_obj.dump(output_file_stream)
+        sys.exit(0)
         #DONE
         
     for term in knaf_obj.get_terms():
@@ -456,10 +438,7 @@ def tag_file_with_opinions(input_file_stream, output_file_stream,model_folder,ka
         text_for_tid[tid] = ' '.join(toks)
 
     #Create a temporary file
-    #print>>sys.stderr,'Extracting features...'
-    sys.stderr.flush()
     out_feat_file, err_feat_file = extract_features(knaf_obj)
-    #print>>sys.stderr,'Done'
     if DEBUG:
         print>>sys.stderr,'#'*50
         print>>sys.stderr,'FEATURE FILE'
@@ -470,12 +449,8 @@ def tag_file_with_opinions(input_file_stream, output_file_stream,model_folder,ka
     
        
     expressions = detect_expressions(out_feat_file,list_token_ids)
-    #print>>sys.stderr,'Detected ',len(expressions),'expressions'
     targets = detect_targets(out_feat_file, list_token_ids)
-    #print>>sys.stderr,'Detected ',len(targets),'targets'
     holders = detect_holders(out_feat_file, list_token_ids)
-    #print>>sys.stderr,'Detected ',len(holders),'holders'
-    sys.stderr.flush()
     
     os.remove(out_feat_file)
     os.remove(err_feat_file)
@@ -501,7 +476,7 @@ def tag_file_with_opinions(input_file_stream, output_file_stream,model_folder,ka
     ####triples = link_entities_distance(expressions,targets,holders,sentence_for_token)
     
     triples = link_entities_svm(expressions, targets, holders, knaf_obj, my_config_manager)
-    #print>>sys.stderr,'Linkage done',len(triples),'triples'
+    
     ids_used = set()
     if remove_existing_opinions:
         knaf_obj.remove_opinion_layer()
@@ -522,7 +497,6 @@ def tag_file_with_opinions(input_file_stream, output_file_stream,model_folder,ka
         my_lp.set_timestamp('*')
     knaf_obj.add_linguistic_processor('opinions',my_lp)
     knaf_obj.dump(output_file_stream)
-    #print>>sys.stderr,'All done'
     
   
 

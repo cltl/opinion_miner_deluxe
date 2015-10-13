@@ -6,7 +6,7 @@ import csv
 import os
 from operator import itemgetter
 
-from VUA_pylib.lexicon import MPQA_subjectivity_lexicon
+#from VUA_pylib.lexicon import MPQA_subjectivity_lexicon
 
 
 def get_first_term_id(token_data,term_data,this_ids):
@@ -77,8 +77,8 @@ def load_propagation_lexicon(propagation_lex_filename):
     return propagated_lexicon
             
     
-#def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,log_file=None,include_class=True,accepted_opinions=None, exp_lex= None, tar_lex=None, propagation_lex_filename=None):
-def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,log_file=None,include_class=True,accepted_opinions=None, lexicons=[]):
+
+def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,log_file=None,include_class=True,accepted_opinions=None, exp_lex= None, tar_lex=None, propagation_lex_filename=None):
     
     labels = []
     
@@ -118,12 +118,21 @@ def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,log_file=None,incl
     if log_on:
         print>>log_desc,'  Number of tokens: ',len(tokens_in_order)
     ###########################
+
+    #Lexicons from the training data
+    mapping_wid_polarity = {}
+    if exp_lex is not None:
+        mapping_wid_polarity = get_mapping_from_lexicon(tokens_ids,exp_lex)
+        
+    mapping_wid_aspect = {}
+    if tar_lex is not None:
+        mapping_wid_aspect = get_mapping_from_lexicon(tokens_ids, tar_lex)
+        
+    propagated_lex = {}
+    if propagation_lex_filename is not None:
+        #Lexicon of [lemma] ==> polarity
+        propagated_lex = load_propagation_lexicon(propagation_lex_filename)
     
-    #We need to create the mappings
-    for lexicon in lexicons:
-        lexicon.create_mapping_for_tokenids(tokens_ids)
-        
-        
     ###########################
     ## EXTRACTING TERMS #######
     term_data = {}  #(term_lemma,term_pos,term_span,polarity)
@@ -173,10 +182,11 @@ def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,log_file=None,incl
     entity_for_term = {}
     for ent_obj in knaf_obj.get_entities():
         ent_type = ent_obj.get_type()
-        for reference_obj in ent_obj.get_references():
-            for span_obj in reference_obj:
-                for t_id in span_obj.get_span_ids():
-                    entity_for_term[t_id] = ent_type
+        if ent_type is not None:
+            for reference_obj in ent_obj.get_references():
+                for span_obj in reference_obj:
+                    for t_id in span_obj.get_span_ids():
+                        entity_for_term[t_id] = ent_type
     if log_on:
         print>>log_desc,'Entities:'+str(entity_for_term)
 
@@ -229,9 +239,7 @@ def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,log_file=None,incl
             ############################
             
             if accepted_opinions is not None:
-                if '*' in accepted_opinions:    ##All polarities are valid, in config there is something like dse = *
-                    mapped_type = accepted_opinions['*']
-                elif exp_type in accepted_opinions:
+                if exp_type in accepted_opinions:
                     #Get the mapping label
                     mapped_type = accepted_opinions[exp_type]
                 else:
@@ -283,7 +291,7 @@ def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,log_file=None,incl
         ##############
             
             
-    my_mpqa_subj_lex = MPQA_subjectivity_lexicon()
+    #my_mpqa_subj_lex = MPQA_subjectivity_lexicon()
     ## WRITE TO THE OUTPUT
     
     
@@ -306,65 +314,45 @@ def extract_features_from_kaf_naf_file(knaf_obj,out_file=None,log_file=None,incl
                 property = property_for_term.get(term_id,'-')
                 this_class = class_for_term_id.get(term_id,'O')
                 
-                
+                '''
                 #Mpqa subjectivy from the mpqa corpus
-                mpqa_subj = mpqa_pol = '-'
+                mpqa_type = mpqa_pol = '-'
                 if my_mpqa_subj_lex is not None:
                     mpqa_data = my_mpqa_subj_lex.get_type_and_polarity(token,term_pos)
                     if mpqa_data is not None:
-                        mpqa_subj, mpqa_pol = mpqa_data
-                               
+                        mpqa_type, mpqa_pol = mpqa_data
+                '''               
                                 
                                 
                 ## Constituency features
                 constituency_extractor = knaf_obj.get_constituency_extractor()
-                feature_phrase = 'XXX'
+                feature_phrase = '-' #'XXX'
                 if constituency_extractor is not None:
                     this_phrase, subsumed_together = constituency_extractor.get_deepest_phrase_for_termid(term_id)
                     if this_phrase is not None:
                         feature_phrase = this_phrase
                 ######################
                                   
-                                  
-                lexicon_features = []
-                for lexicon in lexicons:
-                    value = '-'
-                    if lexicon.is_lemma_based():
-                        value = lexicon.get_value_for_lemma(term_lemma)
-                    elif lexicon.is_multiword_based():
-                        value = lexicon.get_value_for_tokenid(token_id)
-                    if value == None:
-                        value = '-'
-                    lexicon_features.append((lexicon.get_label(),value))
-                        
                 ### Expression from the domain lexicon
-                #polarity_from_domain = mapping_wid_polarity.get(token_id,'-')
+                polarity_from_domain = mapping_wid_polarity.get(token_id,'-')
                 
                 ## Polarity from the propagated lexicon
-                #polarity_from_propagation = propagated_lex.get(term_lemma,'-')
+                polarity_from_propagation = propagated_lex.get(term_lemma,'-')
                 
                 ## Target from the training lexicon
-                #aspect_from_domain = mapping_wid_aspect.get(token_id,'-')
+                aspect_from_domain = mapping_wid_aspect.get(token_id,'-')
                 
                 ##############################################################################################
                 ## FEATURE GENERATION!!!!
                 ##############################################################################################
-                labels =   ['sentence_id','token_id','token','lemma',    'pos',    'term_id', 'pol/mod']
-                features = [ sentence_id,  token_id,  token,  term_lemma, term_pos, term_id,   polarity ]
-                
-                for label, value in lexicon_features:
-                    labels.append(label)
-                    features.append(value)
+                labels =   ['sentence_id','token_id','token','lemma',    'pos',    'term_id', 'pol/mod', 'poldomain',         'aspect_training']
+                features = [ sentence_id,  token_id,  token,  term_lemma, term_pos, term_id,   polarity  ,polarity_from_domain,aspect_from_domain]
                 
                 
-                features.append(mpqa_subj)
-                labels.append('mpqa_subj')
                 
-                features.append(mpqa_pol)
-                labels.append('mpqa_pol')
                 
-                labels.extend(['entity','property','phrase_type','y'])
-                features.extend([entity,property,feature_phrase,this_class])
+                labels.extend(['entity','property','phrase_type','propagation_polarity','y'])
+                features.extend([entity,property,feature_phrase,polarity_from_propagation,this_class])
                 
                 ##############################################################################################
                 ##############################################################################################

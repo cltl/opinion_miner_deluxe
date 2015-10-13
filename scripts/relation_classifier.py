@@ -4,8 +4,6 @@ from extract_feats_relations import *
 from tempfile import NamedTemporaryFile
 from subprocess import Popen, PIPE
 from VUA_pylib.io import Cfeature_index
-from path_finder import *
-
 import os
 
 config_manager = None
@@ -87,8 +85,12 @@ def link_exp_tar_all(expressions,targets, knaf_obj,threshold, use_dependencies=T
         feat_index = Cfeature_index()
         feat_index.load_from_file(feat_index_filename)
         examples_file = NamedTemporaryFile(delete=False)
+        T = 0
         for exp_ids, exp_type in expressions:
+            #print>>sys.stderr,exp_ids, T, 'of', len(expressions)
+            T = T+1
             for tar_ids in targets:
+                #print>>sys.stderr,'\t',tar_ids
                 feats = extract_feats_exp_tar(exp_ids,tar_ids,knaf_obj, use_dependencies=use_dependencies,use_tokens=use_tokens,use_lemmas=use_lemmas)
                 feat_index.encode_example_for_classification(feats, examples_file,my_class='0')
         examples_file.close()
@@ -97,7 +99,7 @@ def link_exp_tar_all(expressions,targets, knaf_obj,threshold, use_dependencies=T
         results = run_svm_classify(examples_file.name, model_file)
         os.remove(examples_file.name)
         
-        threshold = -0.75
+        #threshold = -0.75
         idx = 0
         for exp,exp_type in expressions:
             at_least_one = False
@@ -172,9 +174,11 @@ def link_exp_hol(expressions,holders, knaf_obj,threshold_hol,use_dependencies=Tr
     
 def run_svm_classify(example_file,model_file):
     #usage: svm_classify [options] example_file model_file output_file
-    svmlight = get_path_svmlight_classify()
+    svmlight = config_manager.get_svm_classify_binary()
     if not os.path.exists(svmlight):
-        print>>sys.stderr,'SVMlight classify not found on',svmlight
+        print>>sys.stderr,'SVMlight learn not found on',svmlight
+        print>>sys.stderr,'Check the config filename and make sure the path is correctly set'
+        print>>sys.stderr,'[svmlight]\npath_to_binary_learn = yourpathtolocalsvmlightlearn'
         sys.exit(-1)
                                                       
     cmd = [svmlight]

@@ -125,15 +125,11 @@ def create_rel_exp_tar_training(knaf_obj, output=sys.stdout, valid_opinions=None
         opi_exp = opinion.get_expression()
         exp_type = ''
         exp_ids = []
-        exp_sent = tar_sent = None
         if opi_exp is not None:
             exp_type = opi_exp.get_polarity()
             span = opi_exp.get_span()
             if span is not None:
                 exp_ids = span.get_span_ids()
-                exp_token_ids = knaf_obj.get_dict_tokens_for_termid(exp_ids[0])
-                first_token = knaf_obj.get_token(exp_token_ids[0])
-                exp_sent = int(first_token.get_sent())
 
         opi_tar = opinion.get_target()
         tar_ids = []
@@ -141,9 +137,7 @@ def create_rel_exp_tar_training(knaf_obj, output=sys.stdout, valid_opinions=None
             span = opi_tar.get_span()
             if span is not None:
                 tar_ids = span.get_span_ids()
-                tar_token_ids = knaf_obj.get_dict_tokens_for_termid(tar_ids[0])
-                first_token = knaf_obj.get_token(tar_token_ids[0])
-                tar_sent = int(first_token.get_sent())
+        
        
         if valid_opinions is not None:
             if exp_type not in valid_opinions:
@@ -151,8 +145,7 @@ def create_rel_exp_tar_training(knaf_obj, output=sys.stdout, valid_opinions=None
         
         
         if len(tar_ids) != 0 and len(exp_ids) != 0:
-            if abs(exp_sent - tar_sent) <=2:
-                pairs.append((exp_ids,tar_ids))
+            pairs.append((exp_ids,tar_ids))
 
             
     #extract_feats_exp_tar(exp_ids,tar_ids,knaf_obj, use_lemmas=True, use_tokens=True, use_dependencies=True)
@@ -279,15 +272,11 @@ def create_rel_exp_hol_training(knaf_obj, output=sys.stdout, valid_opinions=None
         opi_exp = opinion.get_expression()
         exp_type = ''
         exp_ids = []
-        exp_sent = hol_sent = None
         if opi_exp is not None:
             exp_type = opi_exp.get_polarity()
             span = opi_exp.get_span()
             if span is not None:
                 exp_ids = span.get_span_ids()
-                exp_token_ids = knaf_obj.get_dict_tokens_for_termid(exp_ids[0])
-                first_token = knaf_obj.get_token(exp_token_ids[0])
-                exp_sent = int(first_token.get_sent())
 
         opi_hol = opinion.get_holder()
         hol_ids = []
@@ -295,10 +284,6 @@ def create_rel_exp_hol_training(knaf_obj, output=sys.stdout, valid_opinions=None
             span = opi_hol.get_span()
             if span is not None:
                 hol_ids = span.get_span_ids()
-                hol_token_ids = knaf_obj.get_dict_tokens_for_termid(hol_ids[0])
-                first_token = knaf_obj.get_token(hol_token_ids[0])
-                hol_sent =  int(first_token.get_sent())
-                
                 
         
         if valid_opinions is not None:
@@ -307,8 +292,7 @@ def create_rel_exp_hol_training(knaf_obj, output=sys.stdout, valid_opinions=None
         
         
         if len(exp_ids) != 0 and len(hol_ids) != 0:
-            if abs(exp_sent - hol_sent) <=2:
-                pairs.append((exp_ids,hol_ids))
+            pairs.append((exp_ids,hol_ids))
             
             
     #for feat_exp, feat_tar
