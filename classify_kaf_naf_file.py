@@ -18,7 +18,11 @@ from scripts.relation_classifier import link_entities_svm
 from scripts.path_finder import *
 from scripts.lexicons import load_lexicons
 from KafNafParserPy import *
-from subjectivity_detector import classify_sentences
+try:
+    from subjectivity_detector import classify_sentences
+except:
+    pass
+  
 from scripts.polarity_classifier import classify as polarity_classifier
 
 
