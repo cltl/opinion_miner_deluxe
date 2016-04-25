@@ -1,7 +1,10 @@
----
+***
+
 #DEPRECATED!!!!!!!#
 *For the last version of the opinion miner deluxe go to [opinion_miner_deluxePP](https://github.com/rubenIzquierdo/opinion_miner_deluxePP)*
----
+
+***
+
 #Opinion miner deluxe#
 
 ##Introduction##
